@@ -269,6 +269,12 @@ class Wordle_Solver:
           
           self.solve(answer,mode=mode)
 
+     def get_word (self):
+
+          """Retrieves a word"""
+
+          return random.choice(self.words)
+
      def show_about (self):
 
           """Shows description of app"""
@@ -337,14 +343,15 @@ if __name__ == "__main__":
                iterations = int(iterations)
                wordle.compare_methods(iterations)
           elif not answer:
+               answer = wordle.get_word()
                print('CHOOSING WORDS RANDOMLY...')
-               wordle.test(1)
+               wordle.solve(answer,mode=1)
                print()
                print('OPTIMIZING FOR FREQUENCY...')
-               wordle.test(0)
+               wordle.solve(answer,mode=0)
                print()
                print('FREQUENCY WITH RANDOMNESS...')
-               wordle.test(2)
+               wordle.solve(answer,mode=2)
                
           elif answer in wordle.words:
                if len(answer) == word_length:
