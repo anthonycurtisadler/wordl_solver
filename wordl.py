@@ -10,7 +10,12 @@ about = """
           
           (For the actual puzzle, see http://foldr.moe/hello-wordl/)
 
-          THE VOCABULARY IS VERY LARGE and STRANGE, and the FIRST CHOICE is not optimized by frequency
+          THE VOCABULARY IS VERY LARGE and STRANGE.
+
+          APPLIES THREE DIFFERENT SOLVING APPROACHES:
+               (1) Chooses the word randomly
+               (2) Chooses the word with the most frequently appearing characters
+               (3) Chooses randomly from the top 10% of the words with the most frequently appearing characters
 
              """
 
@@ -48,6 +53,34 @@ class Wordl_Solver:
 
           
           self.words = [x for x in textfile.split(split_char) if len(x) == word_length and x.lower()==x]
+          self.make_histogram()
+
+     def make_histogram (self):
+
+          print("MAKING HISTOGRAM")
+
+          total_characters = 0
+          self.histogram = {}
+          total_size = len(self.words) * len(self.words[0])
+          for word in self.words:
+               for character in word:
+                    if character not in self.histogram:
+                         self.histogram[character] = 1
+                    else:
+                         self.histogram[character] = self.histogram[character]+1
+                    total_characters += 1
+               if total_characters % 100==0:
+                    print(total_characters,'/',total_size)
+
+          for character in self.histogram:
+               self.histogram[character] = self.histogram[character]/total_characters
+
+     def value_word (self, word):
+
+          total_value = 0
+          for character in set(word):
+               total_value += self.histogram[character]
+          return total_value
 
      def get_word (self):
 
@@ -100,6 +133,10 @@ class Wordl_Solver:
                if letter in word:
                     return True
                return False
+          def fits_not_at_all (letter, position, word):
+               if letter in word:
+                    return False
+               return True 
 
           def apply_to_word (word_a, word_b, positions, function):
 
@@ -112,7 +149,8 @@ class Wordl_Solver:
           return_list = []
           for to_check in all_words:
                if (apply_to_word(word, to_check, schema[0], fits_perfectly) and
-                   apply_to_word(word, to_check, schema[1], fits_almost)):
+                   apply_to_word(word, to_check, schema[1], fits_almost) and
+                   apply_to_word(word, to_check, schema[2], fits_not_at_all)):
 
                     return_list.append(to_check)
           return return_list
@@ -131,20 +169,31 @@ class Wordl_Solver:
      
                
 
-     def solve (self,to_solve):
+     def solve (self,to_solve,mode=1):
 
           already_chosen = set()
           all_words = list(self.words)
+          
 
           counter = 1
 
           while True:
 
-               while True:
+               if mode==1:
+
                     try_this = random.choice(all_words)
-                    if try_this not in already_chosen and not (counter==1 and not self.proper_first_word(try_this)):
-                         
-                         break
+                    
+               elif mode==2:
+
+                    all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
+                    try_this = random.choice(all_words[0:int(len(all_words)/10)+1])
+
+               else:
+                    
+                    all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
+                    try_this = all_words[0]
+                    
+                    
                already_chosen.add(try_this)
                
                print('GUESS #',counter,' = ',try_this)
@@ -154,18 +203,20 @@ class Wordl_Solver:
                print(self.show(try_this, schema))
                
                all_words = self.get_possible_words (try_this,all_words, schema)
+               if try_this in all_words:
+                    all_words.pop(all_words.index(try_this))
 
 
                if solved:
                     break
                counter += 1
                
-     def test (self):
+     def test (self,mode=0):
 
           answer = random.choice(self.words)
           print('ANSWER = ',answer)
           
-          self.solve(answer)
+          self.solve(answer,mode=mode)
 
 
 if __name__ == "__main__":
@@ -176,16 +227,33 @@ if __name__ == "__main__":
           word_length = 5
      wordl = Wordl_Solver(word_length)
 
+
      while True:
 
           answer  = input('ENTER A '+str(word_length)+' letter word or RETURN to choose a word at random')
 
-          wordl = Wordl_Solver(word_length)
+          
           if not answer:
-               wordl.test()
+               print('CHOOSING WORDS RANDOMLY...')
+               wordl.test(1)
+               print()
+               print('OPTIMIZING FOR FREQUENCY...')
+               wordl.test(0)
+               print()
+               print('FREQUENCY WITH RANDOMNESS...')
+               wordl.test(2)
+               
           elif answer in wordl.words:
                if len(answer) == word_length:
-                    wordl.solve(answer)
+                    print('CHOOSING WORDS RANDOMLY...')
+                    wordl.solve(answer,1)
+                    print()
+                    print('OPTIMIZING FOR FREQUENCY...')
+                    wordl.solve(answer,0)
+                    print()
+                    print('FREQUENCY WITH RANDOMNESS...')
+                    wordl.solve(answer,2)
+                    print()
           else:
                print('I KNOW A LOT OF WORDS... but ',answer,'!!!! Really!!!')
                
