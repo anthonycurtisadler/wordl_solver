@@ -10,9 +10,15 @@ class Wordle_Solver:
      def __init__ (self):
 
           self.words = []
+          inp = None
           
-
-          filename = 'words.txt'
+          while inp not in [1,2,3]:
+               inp = input('(1) words.txt\n(2) smallwords.txt [46,000] \n(3) smallerwords.txt [20,000] ')
+               if inp.isnumeric():
+                    inp = int(inp)
+          filename = {1:'words.txt',
+                      2:'smallwords.txt',
+                      3:'smallerwords.txt'}[inp]
 
           # GET TEXT FILE 
           while True:
@@ -65,7 +71,8 @@ class Wordle_Solver:
 
           self.word_length = word_length 
           self.words = [x.strip() for x in self.textfile.split(self.split_char) if len(x.strip()) == word_length and x.strip().lower()==x.strip() and x.strip().isalpha()]
-          
+          print('THERE ARE ',len(self.words),' IN THIS FILE')
+          input('PRESS RETURN TO CONTINUE')
           self.histogram = self.make_histogram()
           self.make_letter_histogram()
           
@@ -254,7 +261,39 @@ class Wordle_Solver:
      
                
 
-     def solve (self,to_solve,mode=1,printing=True):
+     def solve (self,to_solve,mode=1,printing=True,play_mode = False, hard=False):
+
+          def get_letter (word,position):
+
+               return word[position]
+
+          def get_all_letters (word,position_set):
+               return_set = set()
+               for position in position_set:
+                    return_set.add(get_letter(word,position))
+               return return_set
+          
+
+          def translate_schema (word,schema):
+               return get_all_letters(word,schema[0]),get_all_letters(word,schema[1]),get_all_letters(word,schema[2])
+
+          def format_alphabet (exact,almost,not_at_all):
+
+               alphabet_list = []
+               for letter in 'abcdefghijklmnopqrstuvwxyz':
+
+                    if letter in exact:
+                         alphabet_list.append('<<'+letter+'>>')
+                    elif letter in almost:
+                         alphabet_list.append('<'+letter+'>')
+                    elif letter not in not_at_all:
+                         alphabet_list.append(letter)
+               return ' '.join(alphabet_list)
+                                   
+
+          
+
+               
 
           """Solves the to_solve, appling the given mode.
                Mode 0 = Frequency
@@ -269,10 +308,36 @@ class Wordle_Solver:
           
 
           counter = 1
+          outcomes = []
+          exact = set()
+          almost = set()
+          not_at_all = set()
+                                   
+          
 
           while True:
 
-               if mode==1:
+               
+               if play_mode:
+                    try_this = 'X'*self.word_length
+                    print(format_alphabet(exact,almost,not_at_all))
+                    while try_this not in all_words:
+                         
+                         
+                         try_this = input('ENTER '+str(self.word_length)+' DIGIT WORD or Q to QUIT ').lower()
+                         if try_this == 'q':
+                              try_this = to_solve
+                         elif len(try_this) < self.word_length:
+                              print('TOO SHORT!')
+                         elif len(try_this) > self.word_length:
+                              print('TOO LONG!')
+                         elif try_this not in self.words:
+                              print('THIS IS NOT A VALID WORD')
+                         elif try_this not in all_words:
+                              print("INVALID CHOICE!")
+                              
+                   
+               elif mode==1:
                     #Choosing the word randomly
                     
                     try_this = random.choice(all_words)
@@ -334,14 +399,27 @@ class Wordle_Solver:
                     
                already_chosen.add(try_this)
                if printing:
+                    x = ' GUESS #'+str(counter)+' = '+try_this
+                    if not play_mode:
                
-                    print('GUESS #',counter,' = ',try_this,end='  ')
+                         print(x,end='  ')
+                    else:
+                         outcomes.append(x)
+                         print('\n'.join(outcomes),end=' ')
+                         
                
                solved, schema = self.compare_word (try_this, to_solve)
+               if play_mode:
+                    a,b,c = translate_schema(try_this,schema)
+                    exact.update(a)
+                    almost.update(b)
+                    not_at_all.update(c)
+                               
+               
                if printing:
                     print(self.show(try_this, schema))
-               
-               all_words = self.get_possible_words (try_this,all_words, schema)
+               if not (play_mode and not hard):
+                    all_words = self.get_possible_words (try_this,all_words, schema)
                if try_this in all_words:
                     all_words.pop(all_words.index(try_this))
 
@@ -355,6 +433,7 @@ class Wordle_Solver:
           """Tests with a randomly chosen word"""
 
           answer = random.choice(self.words)
+          
           print('ANSWER = ',answer)
           print()
           
@@ -399,7 +478,7 @@ class Wordle_Solver:
           for mode in self.mode_descriptions:
 
                results[mode] = results[mode]/iteration
-               print(mode,
+               print('\n',mode,
                      '/',
                      self.mode_descriptions[mode],
                      ' = ',
@@ -412,7 +491,7 @@ if __name__ == "__main__":
      wordle = Wordle_Solver()
      wordle.show_about()
      try:
-          word_length = int(input('ENTER WORD LENGTH!'))
+          word_length = int(input('ENTER WORD LENGTH! '))
      except:
           word_length = 5
      wordle.constitute(word_length)
@@ -422,7 +501,7 @@ if __name__ == "__main__":
 
      while True:
 
-          answer  = input('\n\nENTER A '+str(word_length)+' letter word or RETURN to choose a word at random or X to compare ')
+          answer  = input('\n\nENTER A '+str(word_length)+' letter word, RETURN to choose a random word, X to compare, or P to PLAY, or H to play HARD MODE ')
 
           if answer == 'X':
                while True:
@@ -431,10 +510,15 @@ if __name__ == "__main__":
                          break
                iterations = int(iterations)
                wordle.compare_methods(iterations)
+          elif answer in ['P','H']:
+               hard = (answer == 'H')
+               answer = wordle.get_word()
+               wordle.solve(to_solve=answer,play_mode=True,hard=hard)
+               
           elif not answer:
                answer = wordle.get_word()
                for m in wordle.mode_descriptions:
-                    print(wordle.mode_descriptions[m])
+                    print('\n',wordle.mode_descriptions[m])
                     wordle.solve(answer,mode=m)
 
                
