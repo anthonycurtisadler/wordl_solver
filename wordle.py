@@ -33,6 +33,14 @@ class Wordle_Solver:
                     break
 
           
+          self.mode_descriptions = {0:"FREQUENCY",
+                      1:"RANDOM",
+                      2:"RANDOM+FREQUENCY /10",
+                      3:"RANDOM+FREQUENCY /20",
+                      4:"RANDOM+FREQUENCY /30",
+                      5:"RANDOM+FREQUENCY skimming",
+                      6:"FREQUENCY BY CHARACTER"}
+          
           
           self.about = """
           WORDL solver
@@ -57,29 +65,60 @@ class Wordle_Solver:
 
           self.word_length = word_length 
           self.words = [x.strip() for x in self.textfile.split(self.split_char) if len(x.strip()) == word_length and x.strip().lower()==x.strip() and x.strip().isalpha()]
-          self.make_histogram()
+          
+          self.histogram = self.make_histogram()
+          self.make_letter_histogram()
+          
 
-     def make_histogram (self):
+     def make_histogram (self,by_letter=False,position=0):
 
           """Forms a histogram of the letters of the alphabet by frequency"""
 
-          print("MAKING HISTOGRAM")
+          print("MAKING HISTOGRAM\n\n'")
+          histogram = {}
+
+
 
           total_characters = 0
-          self.histogram = {}
-          total_size = len(self.words) * len(self.words[0])
-          for word in self.words:
-               for character in word:
-                    if character not in self.histogram:
-                         self.histogram[character] = 1
-                    else:
-                         self.histogram[character] = self.histogram[character]+1
-                    total_characters += 1
-               if total_characters % 100==0:
-                    print(total_characters,'/',total_size)
+          histogram = {}
 
-          for character in self.histogram:
-               self.histogram[character] = self.histogram[character]/total_characters
+          if not by_letter:
+               total_size = len(self.words) * len(self.words[0])
+               for word in self.words:
+                    for character in word:
+                         if character not in histogram:
+                              histogram[character] = 1
+                         else:
+                              histogram[character] = histogram[character]+1
+                         total_characters += 1
+                    if total_characters % 100==0:
+                         print(total_characters,'/',total_size)
+          else:
+
+               total_size = len(self.words)
+               for word in self.words:
+                    if word[position] not in histogram:
+                         histogram[word[position]] = 1
+                    else:
+                         histogram[word[position]] = histogram[word[position]]+1
+                    total_characters += 1
+                    if total_characters % 100==0:
+                         print(total_characters,'/',total_size)
+                         
+          for character in histogram:
+               histogram[character] = histogram[character]/total_characters
+
+
+          print('_______________')
+          return histogram
+
+     def make_letter_histogram (self):
+
+          self.letter_histogram = {}
+          for position in range(self.word_length):
+               self.letter_histogram[position] = self.make_histogram(by_letter=True,position=position)
+
+               
 
      def value_word (self, word):
 
@@ -89,6 +128,17 @@ class Wordle_Solver:
           for character in set(word):
                total_value += self.histogram[character]
           return total_value
+
+     def value_word_by_char (self,word):
+
+          """Returns a value indicating the total of the frequency of each letter in a word using
+          a histogram that distinguishes frequency by position"""
+
+          total_value = 0
+          multi = len(set(word))
+          for position, character in enumerate(word):
+               total_value += self.letter_histogram[position][character] * multi
+          return total_value 
 
 
      def compare_word (self, word_a, word_b):
@@ -209,7 +259,9 @@ class Wordle_Solver:
           """Solves the to_solve, appling the given mode.
                Mode 0 = Frequency
                Mode 1 = Random
-               Mode 2 = Random + Frequency
+               Mode 2-4 = Random + Frequency 10/20/30
+               Mode 5 = Random + Frequency skimming
+               Mode 6 = Positional Frequency
                """
 
           already_chosen = set()
@@ -231,6 +283,45 @@ class Wordle_Solver:
                     all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
                     try_this = random.choice(all_words[0:int(len(all_words)/10)+1])
 
+               elif mode==3:
+                    #Combining both methods
+                    
+                    all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
+                    try_this = random.choice(all_words[0:int(len(all_words)/20)+1])
+
+               elif mode==4:
+                    #Combining both methods
+                    
+                    all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
+                    try_this = random.choice(all_words[0:int(len(all_words)/30)+1])
+
+               elif mode==5:
+                    #Combining both methods v.2
+                    
+                    all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
+                    top_value = self.value_word(all_words[0])
+                    pos = 0
+                    for pos, w in enumerate(all_words):
+                         if self.value_word(w) < top_value:
+                              break
+                    
+                    try_this = random.choice(all_words[0:pos+1])
+
+               elif mode==6:
+                    #By positional frequency
+
+                    all_words = sorted(all_words,key=lambda x:-(self.value_word_by_char(x)))
+                    top_value = self.value_word_by_char(all_words[0])
+                    pos = 0
+                    for pos, w in enumerate(all_words):
+                         if self.value_word_by_char(w) < top_value:
+                              break
+                    
+                    try_this = random.choice(all_words[0:pos+1])
+
+                    
+                    
+
                else:
                     
                     #Choosing the word with the highest frequency value
@@ -244,7 +335,7 @@ class Wordle_Solver:
                already_chosen.add(try_this)
                if printing:
                
-                    print('GUESS #',counter,' = ',try_this)
+                    print('GUESS #',counter,' = ',try_this,end='  ')
                
                solved, schema = self.compare_word (try_this, to_solve)
                if printing:
@@ -285,18 +376,18 @@ class Wordle_Solver:
      def compare_methods (self,iterations=100):
 
           """Compares the results of the different methods for the given number of iterations"""
-          
 
-          results = {0:0,
-                     1:0,
-                     2:0}
+          results = {}
+          for m in self.mode_descriptions:
+               results[m]=0
+
 
           for iteration in range(1,iterations+1):
 
                
                answer = random.choice(self.words)
                result_list = []
-               for mode in range(3):
+               for mode in self.mode_descriptions:
                     
                     
 
@@ -305,14 +396,12 @@ class Wordle_Solver:
                     result_list.append(str(how_many_tries))
                print('ITERATION = ',iteration,' / ',answer,' :: ',', '.join(result_list))
 
-          for mode in range(3):
+          for mode in self.mode_descriptions:
 
                results[mode] = results[mode]/iteration
                print(mode,
                      '/',
-                     {0:"FREQUENCY",
-                      1:"RANDOM",
-                      2:"RANDOM+FREQUENCY"}[mode],
+                     self.mode_descriptions[mode],
                      ' = ',
                      results[mode])
 
@@ -344,72 +433,21 @@ if __name__ == "__main__":
                wordle.compare_methods(iterations)
           elif not answer:
                answer = wordle.get_word()
-               print('CHOOSING WORDS RANDOMLY...')
-               wordle.solve(answer,mode=1)
-               print()
-               print('OPTIMIZING FOR FREQUENCY...')
-               wordle.solve(answer,mode=0)
-               print()
-               print('FREQUENCY WITH RANDOMNESS...')
-               wordle.solve(answer,mode=2)
+               for m in wordle.mode_descriptions:
+                    print(wordle.mode_descriptions[m])
+                    wordle.solve(answer,mode=m)
+
                
           elif answer in wordle.words:
                if len(answer) == word_length:
-                    print('CHOOSING WORDS RANDOMLY...')
-                    wordle.solve(answer,1)
-                    print()
-                    print('OPTIMIZING FOR FREQUENCY...')
-                    wordle.solve(answer,0)
-                    print()
-                    print('FREQUENCY WITH RANDOMNESS...')
-                    wordle.solve(answer,2)
-                    print()
+
+                    for m in wordle.mode_descriptions:
+                         print(wordle.mode_descriptions[m])
+                         wordle.solve(answer,mode=m)
+
+
           else:
                print('I KNOW A LOT OF WORDS... but ',answer,'!!!! Really!!!')
                
                     
-               
-               
-
-               
-
-               
-
-               
-                    
-
-          
-                         
-                    
-          
-          
-                          
-
-               
-          
-          
-
-
-     
-                
-                
-
-
-
-          
-          
-
-
-          
-               
-          
-          
-
-
-
-
-
-          
-          
-
-
+        
