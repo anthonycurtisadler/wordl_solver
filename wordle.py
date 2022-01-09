@@ -1,5 +1,5 @@
 import os, random
-
+os.system('color F0')
 
 
 
@@ -21,7 +21,7 @@ class Wordle_Solver:
                for x in sorted(name_dict):
                     print (str(x),' = ',name_dict[x])
                     
-               inp = input('ENTER NUMBER TO LOAD WORDS')
+               inp = input('ENTER NUMBER TO LOAD WORDS ')
                if inp.isnumeric():
                     inp = int(inp)
                     filename = name_dict[inp]
@@ -547,55 +547,56 @@ class Wordle_Solver:
                      ' = ',
                      results[mode])
 
- 
+     def run (self):
+
+          self.show_about()
+          try:
+               word_length = int(input('ENTER WORD LENGTH! '))
+          except:
+               word_length = 5
+          self.constitute(word_length)
+          
+          
+
+
+          while True:
+
+               answer  = input('\n\nENTER A '+str(word_length)+' letter word, <ENTER> to choose a random word, C(ompare), or (P)lay, or (H)ard play  ')
+
+               if answer == 'C':
+                    while True:
+                         iterations = input('How many iterations? ')
+                         if iterations.isnumeric():
+                              break
+                    iterations = int(iterations)
+                    self.compare_methods(iterations)
+               elif answer in ['P','H']:
+                    hard = (answer == 'H')
+                    answer = self.get_word()
+                    self.solve(to_solve=answer,play_mode=True,hard=hard)
+                    
+               elif not answer:
+                    answer = self.get_word()
+                    for m in self.mode_descriptions:
+                         self.solve(answer,mode=m,header=self.mode_descriptions[m])
+                         
+                         
+
+                    
+               elif answer in self.words:
+                    if len(answer) == word_length:
+
+                         for m in self.mode_descriptions:
+                              print(self.mode_descriptions[m])
+                              self.solve(answer,mode=m)
+
+
+               else:
+                    print('I KNOW A LOT OF WORDS... but ',answer,'!!!! Really!!!')
+
 
 if __name__ == "__main__":
 
      wordle = Wordle_Solver()
-     wordle.show_about()
-     try:
-          word_length = int(input('ENTER WORD LENGTH! '))
-     except:
-          word_length = 5
-     wordle.constitute(word_length)
-     
-     
-
-
-     while True:
-
-          answer  = input('\n\nENTER A '+str(word_length)+' letter word, <ENTER> to choose a random word, C(ompare), or (P)lay, or (H)ard play  ')
-
-          if answer == 'C':
-               while True:
-                    iterations = input('How many iterations? ')
-                    if iterations.isnumeric():
-                         break
-               iterations = int(iterations)
-               wordle.compare_methods(iterations)
-          elif answer in ['P','H']:
-               hard = (answer == 'H')
-               answer = wordle.get_word()
-               wordle.solve(to_solve=answer,play_mode=True,hard=hard)
-               
-          elif not answer:
-               answer = wordle.get_word()
-               for m in wordle.mode_descriptions:
-                    wordle.solve(answer,mode=m,header=wordle.mode_descriptions[m])
-                    
-                    
-
-               
-          elif answer in wordle.words:
-               if len(answer) == word_length:
-
-                    for m in wordle.mode_descriptions:
-                         print(wordle.mode_descriptions[m])
-                         wordle.solve(answer,mode=m)
-
-
-          else:
-               print('I KNOW A LOT OF WORDS... but ',answer,'!!!! Really!!!')
-               
-                    
+     wordle.run()
         
