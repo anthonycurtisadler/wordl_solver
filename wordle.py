@@ -9,36 +9,48 @@ class Wordle_Solver:
 
      def __init__ (self):
 
+          name_dict = {1:'words.txt',
+                      2:'smallwords.txt',
+                      3:'smallerwords.txt',
+                      4:'scrabblewords.txt'}
+
           self.words = []
           inp = None
           
-          while inp not in [1,2,3]:
-               inp = input('(1) words.txt\n(2) smallwords.txt [46,000] \n(3) smallerwords.txt [20,000] ')
+          while inp not in name_dict:
+               for x in sorted(name_dict):
+                    print (str(x),' = ',name_dict[x])
+                    
+               inp = input('ENTER NUMBER TO LOAD WORDS')
                if inp.isnumeric():
                     inp = int(inp)
-          filename = {1:'words.txt',
-                      2:'smallwords.txt',
-                      3:'smallerwords.txt'}[inp]
+                    filename = name_dict[inp]
 
-          # GET TEXT FILE 
-          while True:
-               print('GETTING TEXT FILE!')
-               try:
-                    textfile = open(filename,'r', encoding='utf-8')
-                    self.textfile=textfile.read()
-                    print(filename+' OPENED! \n')
-                    break
-               except:
-                    print(filename+' NOT FOUND\n')
-                    print('ENTER NEW WORD FILE!')
-                    filename= input('textfile')
-          #To find the character dividing the words in the file
-          for split_char in self.textfile:
-               if split_char not in 'abcdefghijklomnopqrstuvwxyz0123456789':
-                    self.split_char = split_char
-                    break
+          # GET TEXT FILE
+          self.textfile = None 
+          if not filename == 'scrabblewords.txt':
+               while True:
+                    print('GETTING TEXT FILE!')
+                    try:
+                         textfile = open(filename,'r', encoding='utf-8')
+                         self.textfile=textfile.read()
+                         print(filename+' OPENED! \n')
+                         break
+                    except:
+                         print(filename+' NOT FOUND\n')
+                         print('ENTER NEW WORD FILE!')
+                         filename= input('textfile')
+               #To find the character dividing the words in the file
+               for split_char in self.textfile:
+                    if split_char not in 'abcdefghijklomnopqrstuvwxyz0123456789':
+                         self.split_char = split_char
+                         break
 
+          dictionaryfile = open('scrabblewords.txt','r', encoding='utf-8')
+          self.dictionaryfile = dictionaryfile.read()
+          print('scrabble.txt OPENED! \n')
           
+     
           self.mode_descriptions = {0:"FREQUENCY",
                       1:"RANDOM",
                       2:"RANDOM+FREQUENCY /10",
@@ -62,19 +74,39 @@ class Wordle_Solver:
           APPLIES THREE DIFFERENT SOLVING APPROACHES:
                (1) Chooses the word with the most frequently appearing characters
                (2) Chooses the word randomly
-               (3) Chooses randomly from the top 10% of the words with the most frequently appearing characters
+               (3) Chooses randomly from the top 10%/5%/2.5% of the words with the most frequently appearing characters
+               (4) Choose word with the most frequent character by position.
+
+          YOU CAN ALSO PLAY THE WORDLE GAME IN BOTH EASY AND HARD MODE.
+          IN THE HARD MODE, YOU HAVE TO SELECT WORDS FOLLOWING PREVIOUS CONSTRAINTS.
+          
 
              """
      def constitute (self,word_length):
 
           """Loads in list of words from textfile"""
 
-          self.word_length = word_length 
-          self.words = [x.strip() for x in self.textfile.split(self.split_char) if len(x.strip()) == word_length and x.strip().lower()==x.strip() and x.strip().isalpha()]
-          print('THERE ARE ',len(self.words),' IN THIS FILE')
+          self.word_length = word_length
+          if self.textfile:
+               self.words = [x.strip() for x in self.textfile.split(self.split_char) if len(x.strip()) == word_length and x.strip().lower()==x.strip() and x.strip().isalpha()]
+               print('THERE ARE ',len(self.words),' WORDS IN THIS FILE')
           input('PRESS RETURN TO CONTINUE')
-          self.histogram = self.make_histogram()
-          self.make_letter_histogram()
+          self.histogram = None
+          self.letter_histogram = None
+          self.dictionary = {}
+          
+          
+          for counter, line in enumerate(self.dictionaryfile.split('\n')):
+               word, definition = line.split('\t')[0].lower().strip(),line.split('\t')[1].strip()
+               if len(word) == self.word_length:
+                         
+                    self.dictionary[word] = definition
+                    if  not self.textfile:
+                         self.words.append(word)
+          if input('DO YOU WANT TO CREATE A FREQUENCY HISTOGRAM? This might take a while... ') in ['yes',' ','YES','Y','y','sure']:
+               
+               self.histogram = self.make_histogram()
+               self.make_letter_histogram()
           
 
      def make_histogram (self,by_letter=False,position=0):
@@ -261,7 +293,14 @@ class Wordle_Solver:
      
                
 
-     def solve (self,to_solve,mode=1,printing=True,play_mode = False, hard=False):
+     def solve (self,to_solve,mode=1,printing=True,play_mode = False, hard=False, header='',show_definition=True):
+          
+          override = False #If true, then shows dictionary definition when not in mode 6
+          
+          if not mode == 1 and not self.histogram:
+               return 0
+          elif (mode == 1 and not self.histogram) or play_mode:
+               override = True 
 
           def get_letter (word,position):
 
@@ -289,6 +328,11 @@ class Wordle_Solver:
                     elif letter not in not_at_all:
                          alphabet_list.append(letter)
                return ' '.join(alphabet_list)
+
+          def show_definition (definition):
+               """Purges CAPITAL letters from definition"""
+
+               return ''.join([x for x in definition if x==x.lower()])
                                    
 
           
@@ -302,7 +346,8 @@ class Wordle_Solver:
                Mode 5 = Random + Frequency skimming
                Mode 6 = Positional Frequency
                """
-
+          if header:
+               print('\n'+header)
           already_chosen = set()
           all_words = list(self.words)
           
@@ -317,16 +362,24 @@ class Wordle_Solver:
 
           while True:
 
+               try_this = None 
+
                
                if play_mode:
                     try_this = 'X'*self.word_length
                     print(format_alphabet(exact,almost,not_at_all))
                     while try_this not in all_words:
                          
-                         
-                         try_this = input('ENTER '+str(self.word_length)+' DIGIT WORD or Q to QUIT ').lower()
+                         print('TOTAL WORDS: ',len(all_words))
+                         print()
+                         try_this = input('ENTER '+str(self.word_length)+' DIGIT WORD or Q to QUIT or H for a hint ').lower()
                          if try_this == 'q':
                               try_this = to_solve
+                         elif try_this == 'h':
+                              if to_solve in self.dictionary:
+                                   print()
+                                   print(show_definition(self.dictionary[to_solve]))
+                                   print()
                          elif len(try_this) < self.word_length:
                               print('TOO SHORT!')
                          elif len(try_this) > self.word_length:
@@ -335,12 +388,14 @@ class Wordle_Solver:
                               print('THIS IS NOT A VALID WORD')
                          elif try_this not in all_words:
                               print("INVALID CHOICE!")
+
                               
                    
                elif mode==1:
                     #Choosing the word randomly
                     
                     try_this = random.choice(all_words)
+   
                     
                elif mode==2:
                     #Combining both methods
@@ -348,17 +403,21 @@ class Wordle_Solver:
                     all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
                     try_this = random.choice(all_words[0:int(len(all_words)/10)+1])
 
+
                elif mode==3:
                     #Combining both methods
                     
                     all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
                     try_this = random.choice(all_words[0:int(len(all_words)/20)+1])
 
+
                elif mode==4:
                     #Combining both methods
                     
                     all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
                     try_this = random.choice(all_words[0:int(len(all_words)/30)+1])
+                    
+
 
                elif mode==5:
                     #Combining both methods v.2
@@ -372,7 +431,8 @@ class Wordle_Solver:
                     
                     try_this = random.choice(all_words[0:pos+1])
 
-               elif mode==6:
+
+               elif mode==6 :
                     #By positional frequency
 
                     all_words = sorted(all_words,key=lambda x:-(self.value_word_by_char(x)))
@@ -391,33 +451,30 @@ class Wordle_Solver:
                     
                     #Choosing the word with the highest frequency value
 
-
-                    
                     all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
                     try_this = all_words[0]
                     
-                    
-               already_chosen.add(try_this)
-               if printing:
-                    x = ' GUESS #'+str(counter)+' = '+try_this
-                    if not play_mode:
-               
-                         print(x,end='  ')
-                    else:
-                         outcomes.append(x)
-                         print('\n'.join(outcomes),end=' ')
-                         
-               
+
                solved, schema = self.compare_word (try_this, to_solve)
                if play_mode:
                     a,b,c = translate_schema(try_this,schema)
                     exact.update(a)
                     almost.update(b)
                     not_at_all.update(c)
+                    if self.histogram:
+                         print('\nFREQUENCY VALUE ',self.value_word(try_this))
+               if printing:
+                    x = ' GUESS #'+str(counter)+' = '+try_this +' '+self.show(try_this, schema)
+                    if not play_mode:
+               
+                         print(x)
+                    else:
+                         outcomes.append(x)
+                         print('\n'.join(outcomes))
                                
                
-               if printing:
-                    print(self.show(try_this, schema))
+##               if printing:
+##                    print(self.show(try_this, schema))
                if not (play_mode and not hard):
                     all_words = self.get_possible_words (try_this,all_words, schema)
                if try_this in all_words:
@@ -425,6 +482,12 @@ class Wordle_Solver:
 
 
                if solved:
+                    to_solve = to_solve.lower()
+
+                    if show_definition and (override or mode == 6) and to_solve in self.dictionary:
+                         print()
+                         print(self.dictionary[to_solve])
+                         print()
                     return counter 
                counter += 1
                
@@ -470,7 +533,7 @@ class Wordle_Solver:
                     
                     
 
-                    how_many_tries = self.solve(answer,mode,printing=False)
+                    how_many_tries = self.solve(answer,mode,printing=False,show_definition=False)
                     results[mode] += how_many_tries
                     result_list.append(str(how_many_tries))
                print('ITERATION = ',iteration,' / ',answer,' :: ',', '.join(result_list))
@@ -501,9 +564,9 @@ if __name__ == "__main__":
 
      while True:
 
-          answer  = input('\n\nENTER A '+str(word_length)+' letter word, RETURN to choose a random word, X to compare, or P to PLAY, or H to play HARD MODE ')
+          answer  = input('\n\nENTER A '+str(word_length)+' letter word, <ENTER> to choose a random word, C(ompare), or (P)lay, or (H)ard play  ')
 
-          if answer == 'X':
+          if answer == 'C':
                while True:
                     iterations = input('How many iterations? ')
                     if iterations.isnumeric():
@@ -518,8 +581,9 @@ if __name__ == "__main__":
           elif not answer:
                answer = wordle.get_word()
                for m in wordle.mode_descriptions:
-                    print('\n',wordle.mode_descriptions[m])
-                    wordle.solve(answer,mode=m)
+                    wordle.solve(answer,mode=m,header=wordle.mode_descriptions[m])
+                    
+                    
 
                
           elif answer in wordle.words:
