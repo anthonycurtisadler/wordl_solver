@@ -16,12 +16,15 @@ class Wordle_Solver:
 
           self.words = []
           inp = None
+          self.log = []
+          self.saved = []
           
           while inp not in name_dict:
                for x in sorted(name_dict):
                     print (str(x),' = ',name_dict[x])
                     
                inp = input('ENTER NUMBER TO LOAD WORDS ')
+               print('\n\n')
                if inp.isnumeric():
                     inp = int(inp)
                     filename = name_dict[inp]
@@ -372,14 +375,19 @@ class Wordle_Solver:
                          
                          print('TOTAL WORDS: ',len(all_words))
                          print()
-                         try_this = input('ENTER '+str(self.word_length)+' DIGIT WORD or Q to QUIT or H for a hint ').lower()
-                         if try_this == 'q':
+                         try_this = input('ENTER '+str(self.word_length)+' DIGIT WORD, X(pose all), (G)ive up, (H)int, (S)ave previous word ').lower()
+                         if try_this == 'g':
                               try_this = to_solve
+                         elif try_this == 'x':
+                              print('\n'+', '.join([str(x[0])+': '+x[1] for x in enumerate(all_words)])+'\n')
                          elif try_this == 'h':
                               if to_solve in self.dictionary:
                                    print()
                                    print(show_definition(self.dictionary[to_solve]))
                                    print()
+                         elif try_this == 's' and self.log:
+                              self.saved.append(self.log[-1])
+                              print('\nSAVED TO LOG: '+self.log[-1][0]+'\n')
                          elif len(try_this) < self.word_length:
                               print('TOO SHORT!')
                          elif len(try_this) > self.word_length:
@@ -388,6 +396,7 @@ class Wordle_Solver:
                               print('THIS IS NOT A VALID WORD')
                          elif try_this not in all_words:
                               print("INVALID CHOICE!")
+                    
 
                               
                    
@@ -483,13 +492,55 @@ class Wordle_Solver:
 
                if solved:
                     to_solve = to_solve.lower()
-
+                    definition = ''
                     if show_definition and (override or mode == 6) and to_solve in self.dictionary:
-                         print()
-                         print(self.dictionary[to_solve])
-                         print()
+                         definition = self.dictionary[to_solve]
+                         print('\n'+definition+'\n')
+                    self.log.append((to_solve, counter, definition))
                     return counter 
                counter += 1
+
+     def apply (self, schema_list_string):
+
+          """Applies a list of schemas to return all the matching words"""
+
+          def decode (entry):
+
+               tried_that, result = entry.split('/')[0],entry.split('/')[1] 
+               exactly= []
+               almost= []
+               not_at_all = []
+               for position, char in enumerate(result):
+                    if char != '_':
+                         if char.lower() == char:
+                              almost.append(position)
+                         else:
+                              exactly.append(position)
+               not_at_all = list([tried_that.index(x) for x in tried_that if x.lower() not in result and x.upper() not in result])
+
+               return tried_that, (exactly, almost, not_at_all)
+
+
+          all_words = list(self.words)
+          for entry in [x.strip() for x in schema_list_string.split(',')]:
+               if ' ' in entry:
+                    entry = entry.replace(' ','/')
+               tried_that, schema = decode(entry)
+               all_words = self.get_possible_words (tried_that,
+                                                    all_words,
+                                                    schema)
+          return all_words 
+             
+     
+     def show_list (self,list_to_show):
+
+          return_list = []
+
+          for count, line_tupple in enumerate(list_to_show):
+               return_list.append('  '+str(count)+' : '+line_tupple[0]+' = '+line_tupple[2]+' ('+str(line_tupple[1])+')')
+          return '\n'.join(return_list)
+
+               
                
      def test (self,mode=0):
 
@@ -561,17 +612,38 @@ class Wordle_Solver:
 
           while True:
 
-               answer  = input('\n\nENTER A '+str(word_length)+' letter word, <ENTER> to choose a random word, C(ompare), or (P)lay, or (H)ard play  ')
+               answer  = input('\n\nENTER A '+str(word_length)
+                               +' letter word, <ENTER> to choose a random word, C(ompare), \n'+
+                               'or (P)lay, or (H)ard play, (L)og,\n (S)ave last, (A)pply schema, or (Q)uit  ').lower()
+               
 
-               if answer == 'C':
+               if answer == 'c':
                     while True:
                          iterations = input('How many iterations? ')
                          if iterations.isnumeric():
                               break
                     iterations = int(iterations)
                     self.compare_methods(iterations)
-               elif answer in ['P','H']:
-                    hard = (answer == 'H')
+               elif answer in ['s']:
+                    if self.log:
+                         self.saved.append(self.log[-1])
+                         print('\nSAVED TO LOG: '+self.log[-1][0]+'\n')
+               elif answer in ['q','l']:
+                    print('\nLOG')
+                    print('\n'+self.show_list(self.log)+'\n')
+                    print('SAVED')
+                    print('\n'+self.show_list(self.saved)+'\n')  
+                    if answer == 'q':
+                         return self.saved
+               elif answer in ['a']:
+                    schema_list_string = input('ENTER guess/answer SEPARATED BY COMMAS')
+                    try:
+                         results = self.apply(schema_list_string)
+                         print('\n'+', '.join([str(x[0])+': '+str(x[1]) for x in enumerate(results)])+'\n')
+                    except:
+                         print('\nERROR!\n')
+               elif answer in ['p','h']:
+                    hard = (answer == 'h')
                     answer = self.get_word()
                     self.solve(to_solve=answer,play_mode=True,hard=hard)
                     
@@ -580,9 +652,7 @@ class Wordle_Solver:
                     for m in self.mode_descriptions:
                          self.solve(answer,mode=m,header=self.mode_descriptions[m])
                          
-                         
-
-                    
+                 
                elif answer in self.words:
                     if len(answer) == word_length:
 
@@ -597,6 +667,17 @@ class Wordle_Solver:
 
 if __name__ == "__main__":
 
-     wordle = Wordle_Solver()
-     wordle.run()
+     while True:
+          wordle = Wordle_Solver()
+          saved_results = wordle.run()
+          logfile = open('log.txt','at', encoding='utf-8')
+          for line in saved_results:
+               logfile.writelines(line[0]+'\t'+line[2]+'\n')
+          logfile.close()
+          
+               
+               
+          
+          
+     
         
