@@ -221,8 +221,13 @@ class Wordle_Solver:
                     for try_word in all_words:
                          solved, schema = self.compare_word (try_word, answer_word)
                          results[answer_word].append(self.get_possible_words(try_word,all_words,schema,length_only=True))
-                    results[answer_word] = sum(results[answer_word])/len(results[answer_word])
-                    print(answer_word,results[answer_word])
+                    average = sum(results[answer_word])/len(results[answer_word])
+                    deviation = sum([abs(average-x) for x in results[answer_word]])/len(results[answer_word])
+                    
+                    results[answer_word] = average + deviation
+                    print(answer_word,' avr:',int(average),'dev:',int(deviation),'total:',
+                          int(results[answer_word]),'freq:',
+                          self.value_word(answer_word),'freq by char:',self.value_word_by_char(answer_word))
                if not already_chosen and not self.saved_results:
                     self.saved_results = results
           ordered_results = sorted([x for x in results.keys() if x not in already_chosen],key = lambda x:results[x])
@@ -302,7 +307,7 @@ class Wordle_Solver:
 
                """True if letter is in the word, but not in the given position"""
 
-               if letter in word:
+               if letter in word and not word[position]==letter:
                     return True
                return False
           def fits_not_at_all (letter, position, word):
