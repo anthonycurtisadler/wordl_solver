@@ -1,5 +1,6 @@
 import os, random
 import math
+import copy 
 os.system('color F0')
 
 
@@ -15,7 +16,7 @@ class Wordle_Solver:
                       3:'smallerwords.txt',
                       4:'scrabblewords.txt'}
 
-          self.words = []
+          word_list= []
           inp = None
           self.log = []
           self.saved = []
@@ -23,6 +24,10 @@ class Wordle_Solver:
           self.function = math.sqrt #FOR mode 5
           self.first_divider = 30 #For mode 3
           self.second_divider = 60 #For mode 4
+          self.cut_off = 300
+          self.words = []
+          self.choose_words = []
+          self.hard = True
           
           while inp not in name_dict:
                for x in sorted(name_dict):
@@ -32,25 +37,28 @@ class Wordle_Solver:
                print('\n\n')
                if inp.isnumeric():
                     inp = int(inp)
-                    filename = name_dict[inp]
+                    self.filename = name_dict[inp]
           
           
           
           # GET TEXT FILE
-          self.textfile = None 
-          if not filename == 'scrabblewords.txt':
+          self.textfile = None
+          if not self.filename == 'scrabblewords.txt':
                while True:
-                    print('GETTING TEXT FILE!')
+                    print('GETTING '+self.filename+'! ')
                     try:
-                         textfile = open(filename,'r', encoding='utf-8')
+
+                         textfile = open(self.filename,'r', encoding='utf-8')
                          self.textfile=textfile.read()
-                         print(filename+' OPENED! \n')
+                         print(self.filename+' OPENED! \n')
                          break
+               
                     except:
-                         print(filename+' NOT FOUND\n')
+                         print(self.filename+' NOT FOUND\n')
                          print('ENTER NEW WORD FILE!')
-                         filename= input('textfile')
-               #To find the character dividing the words in the file
+                         self.filename= input('textfile')
+                    #To find the character dividing the words in the file
+               
                for split_char in self.textfile:
                     if split_char not in 'abcdefghijklomnopqrstuvwxyz0123456789':
                          self.split_char = split_char
@@ -58,18 +66,22 @@ class Wordle_Solver:
 
           dictionaryfile = open('scrabblewords.txt','r', encoding='utf-8')
           self.dictionaryfile = dictionaryfile.read()
-          print('scrabble.txt OPENED! \n')
+          print('scrabblewords.txt OPENED! \n')
+          
           
      
-          self.mode_descriptions = {0:"FREQUENCY",
-                      1:"RANDOM",
-                      2:"RANDOM+FREQUENCY /"+str(self.first_divider),
-                      3:"RANDOM+FREQUENCY /"+str(self.second_divider),
-                      4:"RANDOM+FREQUENCY Sqrt",
-                      5:"RANDOM+FREQUENCY skimming",
-                      6:"FREQUENCY BY CHARACTER"}
-          
-          
+
+          self.script_defaults = {0:'f',
+                          1:'c',
+                          2:'[60]ra',
+                          3:'[60]rb',
+                          4:'[120]ra',
+                          5:'[120]rb',
+                          6:'{arise}[60]xa',
+                          7:'1000.[60]ra;ta'}
+                                  
+          self.scripts = copy.deepcopy(self.script_defaults)
+
           self.about = """
           WORDL solver
 
@@ -81,25 +93,60 @@ class Wordle_Solver:
 
           THE VOCABULARY IS VERY LARGE and STRANGE.
 
-          APPLIES THREE DIFFERENT SOLVING APPROACHES:
-               (1) Chooses the word with the most frequently appearing characters
-               (2) Chooses the word randomly
-               (3) Chooses randomly from a fraction of the frequently appearing characters
-               (4) Choose word with the most frequent character by position.
-               (5) Choose from the words that produce the small average result 
-
           YOU CAN ALSO PLAY THE WORDLE GAME IN BOTH EASY AND HARD MODE.
           IN THE HARD MODE, YOU HAVE TO SELECT WORDS FOLLOWING PREVIOUS CONSTRAINTS.
           
 
              """
+
+          self.script_help = """
+A STRATEGY SCRIPT CONSISTS OF A SERIES OF STRAGIES separated by SEMICOLONS.
+    S1;S2;S3;S4
+
+The FIRST STRATEGY may include a WORD to us in curly brackets
+ALL may include a STRATEGY CODE and an optional DIVIDER, in square brackets
+
+STRATEGY CODES INCLUDE:
+
+i = get best word by the least average size
+     of the subsequent groups it generates (=information)
+c = choose randomly from the group of words with highest frequency value
+f = choose by frequency rank
+r = choose word randomly from the top 1/DIVIDER of words 
+x = choose word randomly from the top words, but applying formula (default = square root)
+r and x can be combined with a and b, or used alone.
+a = rank words by frequency but choose only from the smaller set of words to choose 
+b = rank words by frequency but use any word
+ta = top word by frequency
+tb = top word by frequency from choice words
+
+#. at beginning of STRATEGY to indicate the cut off in the size of the words for the strategy to be applicable.
+
+
+
+
+"""
+          
+
+
      def constitute (self,word_length):
 
           """Loads in list of words from textfile"""
 
           self.word_length = word_length
-          if self.textfile:
-               self.words = [x.strip() for x in self.textfile.split(self.split_char) if len(x.strip()) == word_length and x.strip().lower()==x.strip() and x.strip().isalpha()]
+          if self.word_length == 5 and input('USE 5solutions and 5nonsolutions?') in ['yes',' ','YES','Y','y','sure']:
+               solutions = open('5solutions.txt','r', encoding='utf-8')
+               solutions = solutions.read()
+               nonsolutions = open('5nonsolutions.txt','r', encoding='utf-8')
+               nonsolutions = nonsolutions.read()
+               self.choose_words = [x.strip() for x in solutions.split('\n') if len(x.strip()) == 5]
+               self.words = [x.strip() for x in nonsolutions.split('\n') if len(x.strip()) == 5]+self.choose_words
+              
+          elif self.textfile:
+        
+               self.choose_words = None
+               self.words = [x.strip() for x in self.textfile.split(self.split_char)
+                                  if len(x.strip()) == word_length and x.strip().lower()==x.strip() and x.strip().isalpha()]
                print('THERE ARE ',len(self.words),' WORDS IN THIS FILE')
           input('PRESS RETURN TO CONTINUE')
           self.histogram = None
@@ -117,16 +164,26 @@ class Wordle_Solver:
           self.use_information = False
           if input('DO YOU WANT TO CREATE A FREQUENCY HISTOGRAM? This might take a while... ') in ['yes',' ','YES','Y','y','sure']:
                self.use_information = input('DO you want to use result size for mode 1?') in ['yes',' ','YES','Y','y','sure']
-               
-               self.histogram = self.make_histogram()
+               if self.choose_words:
+                    self.histogram = self.make_histogram(word_list=self.choose_words)
+               else:
+                    self.histogram = self.make_histogram()
                self.make_letter_histogram()
-               if self.use_information:
-                    self.mode_descriptions[1] = "BY SIZE OF THE RESULT OF APPLYING TO WORDS"
-          
 
-     def make_histogram (self,by_letter=False,position=0):
+                    
+     def get_answer (self):
+
+          if self.choose_words:
+               return random.choice(self.choose_words)
+          else:
+               return random.choice(self.words) 
+
+     def make_histogram (self,by_letter=False,position=0, word_list=None):
 
           """Forms a histogram of the letters of the alphabet by frequency"""
+          if word_list is None:
+               word_list = self.words
+               
 
           print("MAKING HISTOGRAM\n\n'")
           histogram = {}
@@ -137,8 +194,8 @@ class Wordle_Solver:
           histogram = {}
 
           if not by_letter:
-               total_size = len(self.words) * len(self.words[0])
-               for word in self.words:
+               total_size = len(word_list) * len(word_list[0])
+               for word in word_list:
                     for character in word:
                          if character not in histogram:
                               histogram[character] = 1
@@ -149,8 +206,8 @@ class Wordle_Solver:
                          print(total_characters,'/',total_size)
           else:
 
-               total_size = len(self.words)
-               for word in self.words:
+               total_size = len(word_list)
+               for word in word_list:
                     if word[position] not in histogram:
                          histogram[word[position]] = 1
                     else:
@@ -370,9 +427,11 @@ class Wordle_Solver:
      
                
 
-     def solve (self,to_solve,mode=1,printing=True,play_mode = False, hard=False, header='',show_definition=True,rank_position=0,first_word=''):
+     def solve (self,to_solve,mode=1,script=None,printing=True,play_mode = False, hard=None, header='',show_definition=True,rank_position=0,first_word='',cut_off=300):
 
           """Basic routine for solving a wordl, applying different approaches"""
+          if hard is None:
+               hard = self.hard
           
           override = False #If true, then shows dictionary definition when not in mode 6
           
@@ -452,9 +511,151 @@ class Wordle_Solver:
           not_at_all = set()
           last_schema_string = '_'*self.word_length
           already_chosen = [] #This is necessary to keep get_word_by_information ending up in an infinite loop
-          
-                                   
-          
+
+
+          def with_play_mode (all_words=None):
+
+               try_this = 'X'*self.word_length
+               print(format_alphabet(exact,almost,not_at_all))
+               while try_this not in all_words:
+                    
+                    print('TOTAL WORDS: ',len(all_words))
+                    print()
+                    try_this = input('ENTER '+str(self.word_length)+' DIGIT WORD, X(pose all), (L)ist by frequency (G)ive up, (H)int, (S)ave previous word ').lower()
+                    if try_this == 'g':
+                         try_this = to_solve
+                    elif try_this in ['l']:
+                         sorted_all_words = sorted(all_words, key=lambda x:-(self.value_word(x)))
+                         print(', '.join([str(x[0])+' :'+x[1] for x in enumerate(sorted_all_words)]))
+                    elif try_this == 'x':
+                         print('\n'+', '.join([str(x[0])+': '+x[1] for x in enumerate(all_words)])+'\n')
+                    elif try_this == 'h':
+                         if to_solve in self.dictionary:
+                              if not hinted:
+                                   if '(' in self.dictionary[to_solve] and ')' in self.dictionary[to_solve]:
+                                        print(self.dictionary[to_solve].split('(')[1].split(')')[0])
+                                   else:
+                                        print('No specification')
+                                   hinted = True
+                              elif hinted:
+                                   print()
+                                   print(show_definition(self.dictionary[to_solve]))
+                                   print()
+                    elif try_this == 's' and self.log:
+                         self.saved.append(self.log[-1])
+                         print('\nSAVED TO LOG: '+self.log[-1][0]+'\n')
+                    elif len(try_this) < self.word_length:
+                         print('TOO SHORT!')
+                    elif len(try_this) > self.word_length:
+                         print('TOO LONG!')
+                    elif try_this not in self.words:
+                         print('THIS IS NOT A VALID WORD')
+                    elif try_this not in all_words:
+                         print("INVALID CHOICE!")
+               return try_this
+
+
+          def solve_mode (all_words=None,script='r',schema_string=None,already_chosen=None,rank_position=None):
+
+               extract = lambda x,y,z: x.split(y)[1].split(z)[0].strip()
+               outside =lambda x,y,z: x.split(y)[0]+x.split(z)[1]
+
+
+               def solve_phrase (all_words=None,phrase='r',schema_string=None,already_chosen=None,rank_position=None):
+
+                    if '{' in phrase and '}' in phrase:
+                         if len(all_words) == len(self.words):
+                              try_this = extract(phrase,'{','}')
+                              return try_this
+                         
+                         
+                    if '[' in phrase and ']' in phrase:
+                         divider = int(extract(phrase,'[',']'))
+                         phrase = outside(phrase,'[',']')
+                         add_to = 1 
+                    else:
+                         divider = 1
+                         add_to = 0
+                         
+                    if 'i' in phrase:
+                         if self.histogram and self.use_information:
+                              try_this = self.get_best_word_by_information(list(all_words),schema_string=last_schema_string,already_chosen=already_chosen)
+                         else:
+                              try_this = random.choice(all_words)
+                         return try_this
+                    elif 'c' in phrase:
+                         all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
+                         top_value = self.value_word(all_words[0])
+                         pos = 0
+                         for pos, w in enumerate(all_words):
+                              if self.value_word(w) < top_value:
+                                   break
+                         try_this = random.choice(all_words[0:pos+1])
+                         return try_this
+                    elif 'f' in phrase:
+                         try_this = all_words[int(len(all_words)*rank_position)]
+                         return try_this
+                    elif 'r' in phrase and not 'a' in phrase and not 'b' in phrase:
+                         if up_to_here == 0:
+                              up_to_here = 1
+                         if up_to_here > len(all_words):
+                              up_to_here = len(all_words)
+                         try_this = random.choice(all_words[0:up_to_here])
+                         return try_this
+                    elif 'x' in phrase and not 'a' in phrase and not 'b' in phrase:
+                         try_this = random.choice(all_words[0:int(self.function(len(all_words)))])
+                    elif 'a' in phrase and self.choose_words:
+                         all_words = [x for x in sorted(all_words,key=lambda x:-(self.value_word(x))) if x in self.choose_words]
+                    elif 'b' in phrase:
+                         all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
+                    if 'r' in phrase or 'x' in phrase:
+                         up_to_here = int(len(all_words)/divider)+add_to
+                         if up_to_here == 0:
+                              up_to_here = 1
+                         if up_to_here > len(all_words):
+                              up_to_here = len(all_words)
+                              
+                         try_this = random.choice(all_words[0:up_to_here])
+                         return try_this
+                    elif 't' in phrase:
+                         try_this = all_words[0]
+                         return try_this 
+     
+                         
+                                                  
+                                        
+                    else:
+                         return all_words[0]         
+                         
+                    
+                         
+
+               if ';' not in script:
+                    y =solve_phrase(all_words=all_words,phrase=script,schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position)
+                    return y,script
+               
+                    
+               elif not script:
+                    return solve_phrase(all_words=all_words,phrase='r',schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position),script
+               else:
+
+                    while (';' in script
+                      and '.' in script.split(';')[0]
+                      and script.split('.')[0].strip().isnumeric()):
+                         cut_off = int(script.split('.')[0].strip())
+                         if len(all_words) < cut_off:
+                              script = ';'.join(script.split(';'))[1:]
+                         else:
+                           break
+                         
+                    phrase = script.split(';')[0]
+                    script = ';'.join(script.split(';'))[1:]
+                    return solve_phrase(all_words=all_words,phrase=phrase,schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position),script
+                    
+          if script is None:
+
+               script = self.scripts[mode]
+               print('SCRIPT=',script)
 
           while True:
 
@@ -463,120 +664,14 @@ class Wordle_Solver:
 
               
                if play_mode:
-                    try_this = 'X'*self.word_length
-                    print(format_alphabet(exact,almost,not_at_all))
-                    while try_this not in all_words:
-                         
-                         print('TOTAL WORDS: ',len(all_words))
-                         print()
-                         try_this = input('ENTER '+str(self.word_length)+' DIGIT WORD, X(pose all), (L)ist by frequency (G)ive up, (H)int, (S)ave previous word ').lower()
-                         if try_this == 'g':
-                              try_this = to_solve
-                         elif try_this in ['l']:
-                              sorted_all_words = sorted(all_words, key=lambda x:-(self.value_word(x)))
-                              print(', '.join([str(x[0])+' :'+x[1] for x in enumerate(sorted_all_words)]))
-                         elif try_this == 'x':
-                              print('\n'+', '.join([str(x[0])+': '+x[1] for x in enumerate(all_words)])+'\n')
-                         elif try_this == 'h':
-                              if to_solve in self.dictionary:
-                                   if not hinted:
-                                        if '(' in self.dictionary[to_solve] and ')' in self.dictionary[to_solve]:
-                                             print(self.dictionary[to_solve].split('(')[1].split(')')[0])
-                                        else:
-                                             print('No specification')
-                                        hinted = True
-                                   elif hinted:
-                                        print()
-                                        print(show_definition(self.dictionary[to_solve]))
-                                        print()
-                         elif try_this == 's' and self.log:
-                              self.saved.append(self.log[-1])
-                              print('\nSAVED TO LOG: '+self.log[-1][0]+'\n')
-                         elif len(try_this) < self.word_length:
-                              print('TOO SHORT!')
-                         elif len(try_this) > self.word_length:
-                              print('TOO LONG!')
-                         elif try_this not in self.words:
-                              print('THIS IS NOT A VALID WORD')
-                         elif try_this not in all_words:
-                              print("INVALID CHOICE!")
                     
-
-                              
-                   
-               elif mode==1:
-##                    #Choosing the word randomly if no frequency dict or by information
-##                    
-##                    
-                    if self.histogram and self.use_information:
-                         try_this = self.get_best_word_by_information(list(all_words),schema_string=last_schema_string,already_chosen=already_chosen)
-                    else:
-                         try_this = random.choice(all_words)
-                    
-   
-                    
-               elif mode==2:
-                    #Combining both methods
-                    
-                    all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
-                    try_this = random.choice(all_words[0:int(len(all_words)/self.first_divider)+1])
-
-
-               elif mode==3:
-                    #Combining both methods
-                    
-                    all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
-                    try_this = random.choice(all_words[0:int(len(all_words)/self.second_divider)+1])
-
-
-               elif mode==4:
-                    #Combining both methods
-                    
-                    all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
-                    up_to_here = int(self.function(len(all_words)))
-                    if up_to_here < 1:
-                         up_to_here = 1
-                    try_this = random.choice(all_words[0:up_to_here])
-                    
-
-
-               elif mode==5:
-                    #Combining both methods v.2
-                    
-                    all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
-                    top_value = self.value_word(all_words[0])
-                    pos = 0
-                    for pos, w in enumerate(all_words):
-                         if self.value_word(w) < top_value:
-                              break
-                    
-                    try_this = random.choice(all_words[0:pos+1])
-
-
-               elif mode==6 :
-
-
-                    all_words = sorted(all_words,key=lambda x:-(self.value_word_by_char(x)))
-                    top_value = self.value_word_by_char(all_words[0])
-                    pos = 0
-                    for pos, w in enumerate(all_words):
-                         if self.value_word_by_char(w) < top_value:
-                              break
-                    
-                    try_this = random.choice(all_words[0:pos+1])
-
-                    
-                    
-
+                    try_this = with_play_mode(all_words=all_words)
+       
                else:
-                    
-                    #Choosing the word with the highest frequency value
 
-                    all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
-                    if not first_word or counter>1:
-                         try_this = all_words[int(len(all_words)*rank_position)]
-                    else:
-                         try_this = first_word 
+                    try_this, script = solve_mode(all_words=all_words, script = script,schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position)
+
+
 
                     
                     
@@ -667,18 +762,13 @@ class Wordle_Solver:
 
           """Tests with a randomly chosen word"""
 
-          answer = random.choice(self.words)
+          answer = get_answer() 
           
           print('ANSWER = ',answer)
           print()
           
           self.solve(answer,mode=mode)
 
-     def get_word (self):
-
-          """Retrieves a word"""
-
-          return random.choice(self.words)
 
      def show_about (self):
 
@@ -686,23 +776,51 @@ class Wordle_Solver:
           
           print(self.about)
 
+     def find_optimum_cut_off (self):
+
+
+          def once_through (words,cut_off):
+
+               total_count = 0
+               worst_case = 0
+
+               for answer in words:
+
+                    how_many_tries = self.solve(answer,mode=3,printing=False,show_definition=False,cut_off=cut_off)
+                    total_count += how_many_tries
+                    if how_many_tries > worst_case:
+                         worst_case = how_many_tries
+
+               return total_count/len(words), worst_case
+          
+                    
+
+          test_set = []
+          constitute_test_set = [x[1] for x in enumerate(self.choose_words) if x[0]%10 == 0]
+          for cut_off in [x*50 for x in range(1,40)]:
+
+               print(cut_off, once_through(constitute_test_set, cut_off))
+                     
+   
+               
+
 
      def compare_methods (self,iterations=100,limited_to=[0,1,2,3,4,5,6]):
 
           """Compares the results of the different methods for the given number of iterations"""
 
           results = {}
-          for m in self.mode_descriptions:
+          for m in self.scripts:
                results[m]=0
 
 
           for iteration in range(1,iterations+1):
 
                
-               answer = random.choice(self.words)
+               answer = self.get_answer()
                print('ANSWER = ',answer)
                result_list = []
-               for mode in self.mode_descriptions:
+               for mode in self.scripts:
                     if mode in limited_to:
                          print(mode)
                          
@@ -713,13 +831,13 @@ class Wordle_Solver:
                          result_list.append(str(how_many_tries))
                print('ITERATION = ',iteration,' / ',answer,' :: ',', '.join(result_list))
 
-          for mode in self.mode_descriptions:
+          for mode in self.scripts:
                if mode in limited_to:
 
                     results[mode] = results[mode]/iteration
                     print('\n',mode,
                           '/',
-                          self.mode_descriptions[mode],
+                          self.scripts[mode],
                           ' = ',
                           results[mode])
 
@@ -735,7 +853,7 @@ class Wordle_Solver:
                for iteration in range(1,iterations+1):
 
                
-                    answer = random.choice(self.words)
+                    answer = self.get_answer()
                     result_list = []
                
                     how_many_tries = self.solve(answer,mode=0,printing=False,show_definition=False,first_word=word)
@@ -770,7 +888,7 @@ class Wordle_Solver:
                for iteration in range(1,iterations+1):
 
                
-                    answer = random.choice(self.words)
+                    answer = self.get_answer()
                     result_list = []
                
                     how_many_tries = self.solve(answer,mode=0,printing=False,show_definition=False, rank_position=value)
@@ -792,6 +910,7 @@ class Wordle_Solver:
           try:
                word_length = int(input('ENTER WORD LENGTH! '))
           except:
+               print('FAILED')
                word_length = 5
           self.constitute(word_length)
           
@@ -801,8 +920,9 @@ class Wordle_Solver:
           while True:
 
                answer  = input('\n\nENTER A '+str(word_length)
-                               +' letter word, <ENTER> to choose a random word, C(ompare),s(E)t dividers, set(F)unction, R(ank compare) \n'+
-                               'or (P)lay, or (H)ard play, (L)og,\n (S)ave last, (T)est a single word, (A)pply schema, or (Q)uit  ').lower()
+                               +' letter word, <ENTER> to choose a random word, C(ompare), E(dit) modes, set(F)unction, R(ank compare) \n'+
+                               'or (P)lay, or (H)ard play, (L)og,\n (S)ave last, (T)est a single word, (O)ptimize cutoff,\n'+
+                               '  (A)pply schema, or (Q)uit  ').lower()
                
 
                if answer in ['c','r','w']:
@@ -812,12 +932,14 @@ class Wordle_Solver:
                               break
                     iterations = int(iterations)
                     if answer == 'c':
-                         modes_to_use = input('ENTER MODES from 0,2,3,4,5,6')
-                         modes_to_use = [x for x in range(7) if str(x) in modes_to_use]
-                         
-                         
+                         modes_to_use = [int(x.strip())
+                                         for x in input('ENTER MODES to use from '
+                                                        +', '.join(sorted([str(x) for x in self.scripts.keys()]))).split(',')
+                                         if x.strip().isnumeric() and int(x.strip()) in self.scripts]
+                                         
+                       
                          self.compare_methods(iterations,modes_to_use)
-                         
+                    
                     elif answer == 'r':
                          
                          self.rank_compare(iterations)
@@ -829,25 +951,16 @@ class Wordle_Solver:
                          depth = int(depth)
                                        
                          self.word_compare(iterations,depth=depth)
-               elif answer == 'e':
-                    for d in [1,2]:
-                         while True:
-                              div = input('Enter divider #'+str(d))
-                              if div.isnumeric() and 0<int(div)<10000:
-                                   div = int(div)
-                              break
-                         if d==1:
-                              self.first_divider = div
-                              self.mode_descriptions[2] = "RANDOM+FREQUENCY /"+str(self.first_divider)
-                         else:
-                              self.second_divider = div
-                              self.mode_descriptions[3] = "RANDOM+FREQUENCY /"+str(self.second_divider)
+               elif answer == 'o':
+                    self.find_optimum_cut_off()
+                    
+                   
+               
                elif answer == 'f':
                     while True:
-                         funct = input("New function for mode 5")
+                         funct = input("New function for f mode")
                          if not funct:
                               self.function  = math.sqrt
-                              self.mode_descriptions[4] = "FUNCTION sqrt"
                               break
                          else:
                               try:
@@ -855,14 +968,39 @@ class Wordle_Solver:
                                    print('100 / '+str(function(100)))
                                    
                                    self.function = function
-                                   self.mode_descriptions[4] = "FUNCTION "+funct
                                    break
                               except:
                                    print('FUNCTION failed')
-                         
+
+               elif answer == 'e':
+          
+
+                    while True:
+
+                         print('ALL MODES')
+                         for mode in sorted(list(self.scripts)):
+                              print(mode,' = ',self.scripts[mode])
+                         print()
+                         command = input('(D)elete, (A)dd, (R)estore, (Q)uit, (C)lear, (H)elp').upper()
+                         if command == 'D':
+                              to_delete = input('DELETE #')
+                              if to_delete.isnumeric() and int(to_delete) in self.scripts:
+                                   delete(self.scripts[to_delete])
+                         elif command == 'A':
+                              new_script = input('ENTER NEW SCRIPT')
+                              new_key = max(list(self.scripts))+1
+                              self.scripts[new_key] = new_script
+                         elif command == 'C':
+                              self.scripts = {}
+                         elif command == 'R':
+                              self.scripts = copy.deepcopy(self.script_defaults)
+                         elif command == 'H':
+                              print(self.script_help)
+                              
+                         elif command == 'Q':
+                              break
                          
                               
-                         
                     
                elif answer == 't':
                     while True:
@@ -907,21 +1045,22 @@ class Wordle_Solver:
                          print('\nERROR!\n')
                elif answer in ['p','h']:
                     hard = (answer == 'h')
-                    answer = self.get_word()
+                    answer = self.get_answer()
                     self.solve(to_solve=answer,play_mode=True,hard=hard)
                     
                elif not answer:
-                    answer = self.get_word()
+                    answer = self.get_answer()
                     print('ANSWER === ',answer)
-                    for m in self.mode_descriptions:
-                         self.solve(answer,mode=m,header=self.mode_descriptions[m])
+                    for m in self.scripts:
+
+                         self.solve(answer,mode=m,header=self.scripts[m])
                          
                  
                elif answer in self.words:
                     if len(answer) == word_length:
 
-                         for m in self.mode_descriptions:
-                              print(self.mode_descriptions[m])
+                         for m in self.scripts:
+                              print(self.scripts[m])
                               self.solve(answer,mode=m)
 
 
