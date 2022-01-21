@@ -76,7 +76,7 @@ class Wordle_Solver:
                           2:'[60]ra',
                           3:'[60]rb',
                           4:'[120]ra',
-                          5:'[120]rb',
+                          5:'[120]*rb',
                           6:'{arise}[60]xa',
                           7:'1000.[60]ra;ta'}
                                   
@@ -108,6 +108,7 @@ ALL may include a STRATEGY CODE and an optional DIVIDER, in square brackets
 
 STRATEGY CODES INCLUDE:
 
+* = to use frequency by char 
 i = get best word by the least average size
      of the subsequent groups it generates (=information)
 c = choose randomly from the group of words with highest frequency value
@@ -161,14 +162,13 @@ tb = top word by frequency from choice words
                     self.dictionary[word] = definition
                     if  not self.textfile:
                          self.words.append(word)
-          self.use_information = False
-          if input('DO YOU WANT TO CREATE A FREQUENCY HISTOGRAM? This might take a while... ') in ['yes',' ','YES','Y','y','sure']:
-               self.use_information = input('DO you want to use result size for mode 1?') in ['yes',' ','YES','Y','y','sure']
-               if self.choose_words:
-                    self.histogram = self.make_histogram(word_list=self.choose_words)
-               else:
-                    self.histogram = self.make_histogram()
-               self.make_letter_histogram()
+
+          self.use_information = input('DO you want to use result size for mode 1?') in ['yes',' ','YES','Y','y','sure']
+          if self.choose_words:
+               self.histogram = self.make_histogram(word_list=self.choose_words)
+          else:
+               self.histogram = self.make_histogram()
+          self.make_letter_histogram()
 
                     
      def get_answer (self):
@@ -183,12 +183,46 @@ tb = top word by frequency from choice words
           """Forms a histogram of the letters of the alphabet by frequency"""
           if word_list is None:
                word_list = self.words
+
+          if not by_letter:
+               histogram = {}
+
+               hist_textfile = self.filename.split('.')[0]+'freq'+str(self.word_length)+'.txt'
                
+               histo_file = None
+               try:
+                    histo_file = open(hist_textfile,'r', encoding='utf-8')
+                    histo_file_text = histo_file.read()
+               except:
+                    print("CAN'T READ!!!")
+                    histo_file_text = ''
+               if histo_file_text:
+                    print('LOADING HISTOGRAM')
 
-          print("MAKING HISTOGRAM\n\n'")
-          histogram = {}
+                    for line in histo_file_text.split('\n'):
+                         if '\t' in line:
+                              letter, value = line.split('\t')[0].strip(),line.split('\t')[1].strip()
+                              if '/' not in letter:
+                                   histogram[letter] = float(value)
+                              else:
+                                   letter, pos = key.split('/')[0].strip(), key.split('/')[1].strip()
+                                   if pos == position:
+                                        histogram[letter] = float(value)
+                    histo_file.close()
+                    
+                    return histogram
+               if not histo_file is None:
+                    histo_file.close()
+               
+          
+                         
+          
 
-
+          print("MAKING A HISTOGRAM FOR "+self.filename)
+          print("THIS MAY TAKE A FEW MINUTES!!")
+          
+          
+          
 
           total_characters = 0
           histogram = {}
@@ -202,8 +236,10 @@ tb = top word by frequency from choice words
                          else:
                               histogram[character] = histogram[character]+1
                          total_characters += 1
-                    if total_characters % 100==0:
-                         print(total_characters,'/',total_size)
+                    if total_characters % 1000==0:
+                         print(total_characters,'/',total_size,end='; ')
+                    
+                         
           else:
 
                total_size = len(word_list)
@@ -213,23 +249,71 @@ tb = top word by frequency from choice words
                     else:
                          histogram[word[position]] = histogram[word[position]]+1
                     total_characters += 1
-                    if total_characters % 100==0:
-                         print(total_characters,'/',total_size)
+                    if total_characters % 1000==0:
+                         print(total_characters,'/',total_size,end='; ')
+                    
                          
           for character in histogram:
                histogram[character] = histogram[character]/total_characters
 
 
           print('_______________')
+
+          if not by_letter:
+
+               histo_file = open(hist_textfile,'at', encoding='utf-8')
+          
+               for chara in histogram:
+                    print('SAVING ',chara)
+                    histo_file.writelines(chara+'\t'+str(histogram[chara])+'\n')
+               histo_file.close()
+               
+          print()
           return histogram
 
      def make_letter_histogram (self):
 
           """Form a histogram of frequency by individual letters"""
 
+
+          hist_textfile = self.filename.split('.')[0]+'posfreq'+str(self.word_length)+'.txt'
           self.letter_histogram = {}
+          
+          
+          histo_file = None
+          try:
+               histo_file = open(hist_textfile,'r', encoding='utf-8')
+               histo_file_text = histo_file.read()
+          except:
+               print("CAN'T READ!!!")
+               histo_file_text = ''
+          if histo_file_text:
+               print('LOADING HISTOGRAM')
+
+               for line in histo_file_text.split('\n'):
+                    if '\t' in line:
+                         letter, value = line.split('\t')[0].strip(),line.split('\t')[1].strip()
+                         if '/' in letter:
+                              letter, pos = letter.split('/')[0].strip(), int(letter.split('/')[1].strip())
+                              if not pos in self.letter_histogram:
+                                   self.letter_histogram[pos] = {}
+                              self.letter_histogram[pos][letter] = float(value)
+               histo_file.close()
+               return None 
+                    
+          if not histo_file is None:
+               histo_file.close()
+                    
+
+          self.letter_histogram = {}
+          histo_file = open(hist_textfile,'at', encoding='utf-8')
+
+          
           for position in range(self.word_length):
                self.letter_histogram[position] = self.make_histogram(by_letter=True,position=position)
+               for letter in self.letter_histogram[position]:
+                    histo_file.writelines(letter+'/'+str(position)+'\t'+str(self.letter_histogram[position][letter])+'\n')
+                    
 
                
 
@@ -576,6 +660,11 @@ tb = top word by frequency from choice words
                     else:
                          divider = 1
                          add_to = 0
+
+                    value_function = self.value_word
+
+                    if '*' in phrase:
+                         value_function = self.value_word_by_char  
                          
                     if 'i' in phrase:
                          if self.histogram and self.use_information:
@@ -584,11 +673,11 @@ tb = top word by frequency from choice words
                               try_this = random.choice(all_words)
                          return try_this
                     elif 'c' in phrase:
-                         all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
-                         top_value = self.value_word(all_words[0])
+                         all_words = sorted(all_words,key=lambda x:-(value_function(x)))
+                         top_value = value_function(all_words[0])
                          pos = 0
                          for pos, w in enumerate(all_words):
-                              if self.value_word(w) < top_value:
+                              if value_function(w) < top_value:
                                    break
                          try_this = random.choice(all_words[0:pos+1])
                          return try_this
@@ -605,9 +694,9 @@ tb = top word by frequency from choice words
                     elif 'x' in phrase and not 'a' in phrase and not 'b' in phrase:
                          try_this = random.choice(all_words[0:int(self.function(len(all_words)))])
                     elif 'a' in phrase and self.choose_words:
-                         all_words = [x for x in sorted(all_words,key=lambda x:-(self.value_word(x))) if x in self.choose_words]
+                         all_words = [x for x in sorted(all_words,key=lambda x:-(value_function(x))) if x in self.choose_words]
                     elif 'b' in phrase:
-                         all_words = sorted(all_words,key=lambda x:-(self.value_word(x)))
+                         all_words = sorted(all_words,key=lambda x:-(value_function(x)))
                     if 'r' in phrase or 'x' in phrase:
                          up_to_here = int(len(all_words)/divider)+add_to
                          if up_to_here == 0:
@@ -706,7 +795,7 @@ tb = top word by frequency from choice words
                if solved:
                     to_solve = to_solve.lower()
                     definition = ''
-                    if show_definition and (override or mode == 6) and to_solve in self.dictionary:
+                    if show_definition and (override or mode == max(self.scripts.keys())) and to_solve in self.dictionary:
                          definition = self.dictionary[to_solve]
                          print('\n'+definition+'\n')
                     self.log.append((to_solve, counter, definition))
