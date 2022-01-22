@@ -1,6 +1,9 @@
 # wordle_solver
-A little app for playing wordle, automatically solving wordle puzzles, and comparing different methods of solving.
 
-Also a good way to learn vocabulary, since it includes dictionary definitions for all scrabble words.
+1) ALLOWS YOU to PLAY wordles in EASY and HARD mode with from various word lists and of various word lengths.
+2) ALLOWS YOU to find eligible words matching guesses and responses already given.
+3) PROVIDES definitions for words 
+4) ALLOWS you to save interesting words and definitions to a textfile
+5) ALLOWS YOU to test various strategies for solving.
 
 
