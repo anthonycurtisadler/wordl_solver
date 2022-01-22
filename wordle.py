@@ -29,45 +29,20 @@ class Wordle_Solver:
           self.choose_words = []
           self.hard = True
           
-          while inp not in name_dict:
-               for x in sorted(name_dict):
-                    print (str(x),' = ',name_dict[x])
-                    
-               inp = input('ENTER NUMBER TO LOAD WORDS ')
-               print('\n\n')
-               if inp.isnumeric():
-                    inp = int(inp)
-                    self.filename = name_dict[inp]
-          
           
           
           # GET TEXT FILE
-          self.textfile = None
-          if not self.filename == 'scrabblewords.txt':
-               while True:
-                    print('GETTING '+self.filename+'! ')
-                    try:
+          self.filename, self.textfile, self.split_char = self.open_file()
 
-                         textfile = open(self.filename,'r', encoding='utf-8')
-                         self.textfile=textfile.read()
-                         print(self.filename+' OPENED! \n')
-                         break
-               
-                    except:
-                         print(self.filename+' NOT FOUND\n')
-                         print('ENTER NEW WORD FILE!')
-                         self.filename= input('textfile')
-                    #To find the character dividing the words in the file
-               
-               for split_char in self.textfile:
-                    if split_char not in 'abcdefghijklomnopqrstuvwxyz0123456789':
-                         self.split_char = split_char
-                         break
 
-          dictionaryfile = open('scrabblewords.txt','r', encoding='utf-8')
-          self.dictionaryfile = dictionaryfile.read()
-          print('scrabblewords.txt OPENED! \n')
-          
+          dictionary_file_name = 'DIC_'+self.filename.split('_')[1]+'.txt'
+          try:
+               dictionaryfile = open(dictionary_file_name,'r', encoding='utf-8')
+               self.dictionaryfile = dictionaryfile.read()
+               print(dictionary_file_name+ ' OPENED!\n')
+          except:
+               print(dictionary_file_name+ ' COULD NOT OPEN!\n')
+               self.dictionaryfile = None
           
      
 
@@ -128,40 +103,74 @@ tb = top word by frequency from choice words
 
 """
           
+     def open_file (self):
 
+          allfiles = os.listdir()
+          filename, textfile, split_char = None, None, None 
+
+          files_to_show = [x for x in allfiles if x.endswith('.txt') and x.startswith('WORDS_') and not 'freq' in x]
+          for line, f in enumerate(files_to_show):
+               print(line,' : ',f)
+
+          while True:
+               file_number = input('SELECT FILE TO LOAD?')
+               if file_number.isnumeric() and 0<=int(file_number)<len(files_to_show):
+                    filename = files_to_show[int(file_number)]
+                    
+                    
+               if not filename.startswith('DIC_'):
+                         print('GETTING '+filename+'! ')
+
+                         textfile = open(filename,'r', encoding='utf-8')
+                         textfile=textfile.read()
+                         print(filename+' OPENED! \n')
+                         break
+               else:
+                    break
+                    
+          split_char = '\n'
+                         
+                    #To find the character dividing the words in the file
+          return filename, textfile, split_char 
+               
+               
+
+          
+          
+               
 
      def constitute (self,word_length):
 
           """Loads in list of words from textfile"""
 
           self.word_length = word_length
-          if self.word_length == 5 and input('USE 5solutions and 5nonsolutions?') in ['yes',' ','YES','Y','y','sure']:
-               solutions = open('5solutions.txt','r', encoding='utf-8')
+
+          if '_NS_' in self.filename:
+               new_file_name = self.filename.split('_NS_')[0]+'_S_'+self.filename.split('_NS_')[1]
+               solutions = open(new_file_name,'r', encoding='utf-8')
                solutions = solutions.read()
-               nonsolutions = open('5nonsolutions.txt','r', encoding='utf-8')
-               nonsolutions = nonsolutions.read()
                self.choose_words = [x.strip() for x in solutions.split('\n') if len(x.strip()) == 5]
-               self.words = [x.strip() for x in nonsolutions.split('\n') if len(x.strip()) == 5]+self.choose_words
               
-          elif self.textfile:
+          if self.textfile:
         
                self.choose_words = None
                self.words = [x.strip() for x in self.textfile.split(self.split_char)
                                   if len(x.strip()) == word_length and x.strip().lower()==x.strip() and x.strip().isalpha()]
                print('THERE ARE ',len(self.words),' WORDS IN THIS FILE')
+
           input('PRESS RETURN TO CONTINUE')
           self.histogram = None
           self.letter_histogram = None
           self.dictionary = {}
+          if self.dictionaryfile:
           
-          
-          for counter, line in enumerate(self.dictionaryfile.split('\n')):
-               word, definition = line.split('\t')[0].lower().strip(),line.split('\t')[1].strip()
-               if len(word) == self.word_length:
-                         
-                    self.dictionary[word] = definition
-                    if  not self.textfile:
-                         self.words.append(word)
+               for counter, line in enumerate(self.dictionaryfile.split('\n')):
+                    word, definition = line.split('\t')[0].lower().strip(),line.split('\t')[1].strip()
+                    if len(word) == self.word_length:
+                              
+                         self.dictionary[word] = definition
+                         if  not self.textfile:
+                              self.words.append(word)
 
           self.use_information = input('DO you want to use result size for mode 1?') in ['yes',' ','YES','Y','y','sure']
           if self.choose_words:
@@ -366,9 +375,9 @@ tb = top word by frequency from choice words
                     deviation = sum([abs(average-x) for x in results[answer_word]])/len(results[answer_word])
                     
                     results[answer_word] = average + deviation
-                    print(answer_word,' avr:',int(average),'dev:',int(deviation),'total:',
-                          int(results[answer_word]),'freq:',
-                          self.value_word(answer_word),'freq by char:',self.value_word_by_char(answer_word))
+##                    print(answer_word,' avr:',int(average),'dev:',int(deviation),'total:',
+##                          int(results[answer_word]),'freq:',
+##                          self.value_word(answer_word),'freq by char:',self.value_word_by_char(answer_word))
                if not already_chosen and not self.saved_results:
                     self.saved_results = results
           ordered_results = sorted([x for x in results.keys() if x not in already_chosen],key = lambda x:results[x])
@@ -685,6 +694,7 @@ tb = top word by frequency from choice words
                          try_this = all_words[int(len(all_words)*rank_position)]
                          return try_this
                     elif 'r' in phrase and not 'a' in phrase and not 'b' in phrase:
+                         up_to_here = int(len(all_words)/divider)+add_to
                          if up_to_here == 0:
                               up_to_here = 1
                          if up_to_here > len(all_words):
@@ -738,7 +748,7 @@ tb = top word by frequency from choice words
                            break
                          
                     phrase = script.split(';')[0]
-                    script = ';'.join(script.split(';'))[1:]
+                    script = ';'.join(script.split(';')[1:])
                     return solve_phrase(all_words=all_words,phrase=phrase,schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position),script
                     
           if script is None:
@@ -758,7 +768,11 @@ tb = top word by frequency from choice words
        
                else:
 
-                    try_this, script = solve_mode(all_words=all_words, script = script,schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position)
+                    try_this, script = solve_mode(all_words=all_words,
+                                                  script = script,
+                                                  schema_string=last_schema_string,
+                                                  already_chosen=already_chosen,
+                                                  rank_position=rank_position)
 
 
 
@@ -1009,7 +1023,7 @@ tb = top word by frequency from choice words
           while True:
 
                answer  = input('\n\nENTER A '+str(word_length)
-                               +' letter word, <ENTER> to choose a random word, C(ompare), E(dit) modes, set(F)unction, R(ank compare) \n'+
+                               +' letter word, <ENTER> to choose a random word, (C)ompare, (E)dit modes, set(F)unction, R(ank compare) \n'+
                                'or (P)lay, or (H)ard play, (L)og,\n (S)ave last, (T)est a single word, (O)ptimize cutoff,\n'+
                                '  (A)pply schema, or (Q)uit  ').lower()
                
@@ -1074,10 +1088,14 @@ tb = top word by frequency from choice words
                          if command == 'D':
                               to_delete = input('DELETE #')
                               if to_delete.isnumeric() and int(to_delete) in self.scripts:
-                                   delete(self.scripts[to_delete])
+                                   del(self.scripts[int(to_delete)])
                          elif command == 'A':
                               new_script = input('ENTER NEW SCRIPT')
-                              new_key = max(list(self.scripts))+1
+                              if self.scripts:
+                                   maximum_key =max(list(self.scripts))
+                              else:
+                                   maximum_key = -1
+                              new_key = maximum_key+1
                               self.scripts[new_key] = new_script
                          elif command == 'C':
                               self.scripts = {}
