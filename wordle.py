@@ -1,7 +1,9 @@
 import os, random
 import math
-import copy 
+import copy
+import datetime
 os.system('color F0')
+
 
 
 
@@ -11,10 +13,6 @@ class Wordle_Solver:
 
      def __init__ (self):
 
-          name_dict = {1:'words.txt',
-                      2:'smallwords.txt',
-                      3:'smallerwords.txt',
-                      4:'scrabblewords.txt'}
 
           word_list= []
           inp = None
@@ -28,22 +26,31 @@ class Wordle_Solver:
           self.words = []
           self.choose_words = []
           self.hard = True
+
+
+          self.make_new_directory()       
           
           
           
           # GET TEXT FILE
-          self.filename, self.textfile, self.split_char = self.open_file()
+          self.filename, self.textfile, self.split_char, self.language = self.open_file()
 
 
-          dictionary_file_name = 'DIC_'+self.filename.split('_')[1]+'.txt'
+          dictionary_file_name = 'DIC_'+self.filename.split('_')[1]
+          if not dictionary_file_name.endswith('.txt'):
+                dictionary_file_name+='.txt'
+          
+     
+          
           try:
-               dictionaryfile = open(dictionary_file_name,'r', encoding='utf-8')
+               dictionaryfile = open('wordlists'+os.altsep+dictionary_file_name,
+                                     'r', encoding='utf-8')
                self.dictionaryfile = dictionaryfile.read()
                print(dictionary_file_name+ ' OPENED!\n')
           except:
                print(dictionary_file_name+ ' COULD NOT OPEN!\n')
                self.dictionaryfile = None
-          
+
      
 
           self.script_defaults = {0:'f',
@@ -66,7 +73,8 @@ class Wordle_Solver:
           
           (For the actual puzzle, see http://foldr.moe/hello-wordle/)
 
-          THE VOCABULARY IS VERY LARGE and STRANGE.
+          YOU CAN USE ANY LIST OF WORDS, PLAY THE GAME OR SOLVE AUTOMATICALLY,
+          AND AUTOMATICALLY TEST DIFFERENT SOLVING METHODS.
 
           YOU CAN ALSO PLAY THE WORDLE GAME IN BOTH EASY AND HARD MODE.
           IN THE HARD MODE, YOU HAVE TO SELECT WORDS FOLLOWING PREVIOUS CONSTRAINTS.
@@ -105,33 +113,40 @@ tb = top word by frequency from choice words
           
      def open_file (self):
 
-          allfiles = os.listdir()
-          filename, textfile, split_char = None, None, None 
+          """To open file containing word lists"""
 
-          files_to_show = [x for x in allfiles if x.endswith('.txt') and x.startswith('WORDS_') and not 'freq' in x]
+          allfiles = os.listdir(os.getcwd()+os.altsep+'wordlists'+os.altsep)
+          filename, textfile, split_char, language = None, None, None, None 
+
+          files_to_show = [x for x in allfiles if x.endswith('.txt') and (x.startswith('WORDS_') or x.startswith('DIC_')) and not 'freq' in x]
           for line, f in enumerate(files_to_show):
                print(line,' : ',f)
 
           while True:
+               print()
                file_number = input('SELECT FILE TO LOAD?')
                if file_number.isnumeric() and 0<=int(file_number)<len(files_to_show):
                     filename = files_to_show[int(file_number)]
                     
                     
-               if not filename.startswith('DIC_'):
+               if filename and not filename.startswith('DIC_'):
                          print('GETTING '+filename+'! ')
 
-                         textfile = open(filename,'r', encoding='utf-8')
+                         textfile = open('wordlists'+os.altsep+filename,'r', encoding='utf-8')
                          textfile=textfile.read()
                          print(filename+' OPENED! \n')
+                         language = filename.split('_')[1].split('_')[0]
                          break
-               else:
+               elif filename:
+                    language = filename.split('_')[1].split('_')[0].split('.')[0]
                     break
+               
                     
           split_char = '\n'
+          print()
                          
                     #To find the character dividing the words in the file
-          return filename, textfile, split_char 
+          return filename, textfile, split_char, language  
                
                
 
@@ -147,7 +162,7 @@ tb = top word by frequency from choice words
 
           if '_NS_' in self.filename:
                new_file_name = self.filename.split('_NS_')[0]+'_S_'+self.filename.split('_NS_')[1]
-               solutions = open(new_file_name,'r', encoding='utf-8')
+               solutions = open('wordlists'+os.altsep+new_file_name,'r', encoding='utf-8')
                solutions = solutions.read()
                self.choose_words = [x.strip() for x in solutions.split('\n') if len(x.strip()) == 5]
               
@@ -162,6 +177,8 @@ tb = top word by frequency from choice words
           self.histogram = None
           self.letter_histogram = None
           self.dictionary = {}
+    
+          
           if self.dictionaryfile:
           
                for counter, line in enumerate(self.dictionaryfile.split('\n')):
@@ -171,6 +188,7 @@ tb = top word by frequency from choice words
                          self.dictionary[word] = definition
                          if  not self.textfile:
                               self.words.append(word)
+          
 
           self.use_information = input('DO you want to use result size for mode 1?') in ['yes',' ','YES','Y','y','sure']
           if self.choose_words:
@@ -179,8 +197,27 @@ tb = top word by frequency from choice words
                self.histogram = self.make_histogram()
           self.make_letter_histogram()
 
-                    
+     def make_new_directory (self,
+                             directory_name='wordlists'):
+
+        """Create a new directory to various types of folders"""
+
+        full_path = os.getcwd()
+        allfiles = os.listdir(full_path)
+        return_text = ""
+
+        if directory_name not in allfiles:
+            try:
+                os.mkdir(full_path+os.altsep+directory_name)
+                return_text = 'NEW FOLDER CREATED: '+directory_name
+            except:
+                return_text = 'NEW FOLDER CREATION FAILED'
+
+        print (return_text)             
+
      def get_answer (self):
+
+          """Chooses the answer to solve"""
 
           if self.choose_words:
                return random.choice(self.choose_words)
@@ -190,6 +227,8 @@ tb = top word by frequency from choice words
      def make_histogram (self,by_letter=False,position=0, word_list=None):
 
           """Forms a histogram of the letters of the alphabet by frequency"""
+          self.make_new_directory('frequencylists')
+          
           if word_list is None:
                word_list = self.words
 
@@ -200,7 +239,8 @@ tb = top word by frequency from choice words
                
                histo_file = None
                try:
-                    histo_file = open(hist_textfile,'r', encoding='utf-8')
+                    histo_file = open('frequencylists'+os.altsep+hist_textfile,
+                                      'r', encoding='utf-8')
                     histo_file_text = histo_file.read()
                except:
                     print("CAN'T READ!!!")
@@ -270,7 +310,8 @@ tb = top word by frequency from choice words
 
           if not by_letter:
 
-               histo_file = open(hist_textfile,'at', encoding='utf-8')
+               histo_file = open('frequencylists'+os.altsep+
+                                 hist_textfile,'at', encoding='utf-8')
           
                for chara in histogram:
                     print('SAVING ',chara)
@@ -291,7 +332,7 @@ tb = top word by frequency from choice words
           
           histo_file = None
           try:
-               histo_file = open(hist_textfile,'r', encoding='utf-8')
+               histo_file = open('frequencylists'+os.altsep+hist_textfile,'r', encoding='utf-8')
                histo_file_text = histo_file.read()
           except:
                print("CAN'T READ!!!")
@@ -315,7 +356,7 @@ tb = top word by frequency from choice words
                     
 
           self.letter_histogram = {}
-          histo_file = open(hist_textfile,'at', encoding='utf-8')
+          histo_file = open('frequencylists'+os.altsep+hist_textfile,'at', encoding='utf-8')
 
           
           for position in range(self.word_length):
@@ -395,7 +436,7 @@ tb = top word by frequency from choice words
 
      def compare_word (self, word_a, word_b):
 
-          """Compares one word A to another B and returns a boolean value (True if they are identical) and
+          """Compares one A to another B and returns a boolean value (True if they are identical) and
           a schema in the form of a tuple indicating the match between the two words:
                (1) list of positions in A that match perfectly.
                (2) list of positions in B where the letter is found in B
@@ -608,6 +649,8 @@ tb = top word by frequency from choice words
 
           def with_play_mode (all_words=None):
 
+               """For where the user plays the wordl game"""
+
                try_this = 'X'*self.word_length
                print(format_alphabet(exact,almost,not_at_all))
                while try_this not in all_words:
@@ -650,11 +693,15 @@ tb = top word by frequency from choice words
 
           def solve_mode (all_words=None,script='r',schema_string=None,already_chosen=None,rank_position=None):
 
+               """For solving by applying automatic strategies"""
+
                extract = lambda x,y,z: x.split(y)[1].split(z)[0].strip()
                outside =lambda x,y,z: x.split(y)[0]+x.split(z)[1]
 
 
                def solve_phrase (all_words=None,phrase='r',schema_string=None,already_chosen=None,rank_position=None):
+
+                    """Interprets the phrase expressing the solving method"""
 
                     if '{' in phrase and '}' in phrase:
                          if len(all_words) == len(self.words):
@@ -908,29 +955,43 @@ tb = top word by frequency from choice words
                
 
 
-     def compare_methods (self,iterations=100,limited_to=[0,1,2,3,4,5,6]):
+     def compare_methods (self,iterations=100,iterate_over=None,limited_to=[0,1,2,3,4,5,6]):
+
+          
 
           """Compares the results of the different methods for the given number of iterations"""
 
           results = {}
+          result_list = []
+          result_histogram = {}
           for m in self.scripts:
                results[m]=0
+               result_histogram[m] = {}
+          if iterate_over:
+               iterations = len(iterate_over)
+               
 
 
           for iteration in range(1,iterations+1):
 
+               if not iterate_over:
+                    answer = self.get_answer()
+               else:
+                    answer = iterate_over[iteration-1]
+                    
                
-               answer = self.get_answer()
-               print('ANSWER = ',answer)
                result_list = []
                for mode in self.scripts:
                     if mode in limited_to:
-                         print(mode)
-                         
+                         print('ANSWER = ',answer,' MODE = ',mode)
                          
 
-                         how_many_tries = self.solve(answer,mode,printing=True,show_definition=False)
+                         how_many_tries = self.solve(answer,mode,printing=(iterations<100),show_definition=False)
                          results[mode] += how_many_tries
+                         if how_many_tries not in result_histogram[mode]:
+                              result_histogram[mode][how_many_tries] = 1
+                         else:
+                              result_histogram[mode][how_many_tries] += 1
                          result_list.append(str(how_many_tries))
                print('ITERATION = ',iteration,' / ',answer,' :: ',', '.join(result_list))
 
@@ -938,11 +999,18 @@ tb = top word by frequency from choice words
                if mode in limited_to:
 
                     results[mode] = results[mode]/iteration
-                    print('\n',mode,
-                          '/',
-                          self.scripts[mode],
-                          ' = ',
-                          results[mode])
+
+                    to_print = ' '+str(mode)+'/'+self.scripts[mode]+' = '+str(results[mode])
+                    print('\n'+to_print)
+                    result_list.append(str(datetime.datetime.now())+':'+'<'+self.language+'/'+self.filename+'>'+': '+to_print+'\n')
+                    
+                    histo_print ='HISTOGRAM ' + '<' +str(mode)+'> '+ ', '.join([str(x)+'='+str(result_histogram[mode][x]) for x in sorted(result_histogram[mode])])
+                    print(histo_print)
+                    result_list.append(histo_print)
+                    
+          return result_list
+     
+                    
 
      def word_compare (self,iterations=100,depth=300):
 
@@ -962,7 +1030,7 @@ tb = top word by frequency from choice words
                     how_many_tries = self.solve(answer,mode=0,printing=False,show_definition=False,first_word=word)
                     results[word] += how_many_tries
                     result_list.append(str(how_many_tries))
-##                    print('Value= ',value,' ITERATION = ',iteration,' / ',answer,' :: ',', '.join(result_list))
+
                result = results[word]/iterations
                print(' = ',result)
                results[word]  = result
@@ -971,6 +1039,15 @@ tb = top word by frequency from choice words
                print(results[word],' / ',word+' ('+str(self.value_word(word))+'/'+str(self.value_word_by_char(word))+')')
                
                
+     def log_lines (self,filename='log.txt',lines=None):
+
+          """Adds a lines to the end of the log file"""
+
+          self.make_new_directory('logs')
+          logfile = open('logs'+os.altsep+filename,'at', encoding='utf-8')
+          for line in lines:
+               logfile.writelines(line)
+          logfile.close()
           
 
                
@@ -1010,11 +1087,30 @@ tb = top word by frequency from choice words
           """Runs main loop"""
 
           self.show_about()
-          try:
-               word_length = int(input('ENTER WORD LENGTH! '))
-          except:
-               print('FAILED')
-               word_length = 5
+          while True:
+               
+               word_length = input('ENTER WORD LENGTH OR A(analyse)! ')
+               if not word_length:
+                    word_length = 5
+                    break
+               elif word_length.isnumeric():
+                    word_length = int(word_length)
+                    break
+               elif word_length.lower() == 'a':
+                    temp_histo = {}
+                    
+                    for line in self.textfile.split('\n'):
+                         line = len(line.split('\t')[0])
+                         if line not in temp_histo:
+                              temp_histo[line] = 1
+                         else:
+                              temp_histo[line] += 1
+                    histo_print ='HISTOGRAM ' + ', '.join([str(x)+'='+str(temp_histo[x]) for x in sorted(temp_histo)])
+                    print(histo_print)
+                    
+                    
+                    
+          
           self.constitute(word_length)
           
           
@@ -1030,20 +1126,33 @@ tb = top word by frequency from choice words
 
                if answer in ['c','r','w']:
                     while True:
-                         iterations = input('How many iterations? ')
-                         if iterations.isnumeric():
+                         iterations = input('How many iterations or RETURN to use entire wordset? ')
+                         if iterations.isnumeric() or (answer=='c' and not iterations):
                               break
-                    iterations = int(iterations)
+                    if not iterations:
+                         iterations = None
+                         if self.choose_words:
+                              iterate_over = self.choose_words
+                         else:
+                              iterate_over = self.words
+                    else:
+                         iterate_over = None
+                         iterations = int(iterations)
+                              
+                              
+                    
                     if answer == 'c':
                          modes_to_use = [int(x.strip())
                                          for x in input('ENTER MODES to use from '
                                                         +', '.join(sorted([str(x) for x in self.scripts.keys()]))).split(',')
                                          if x.strip().isnumeric() and int(x.strip()) in self.scripts]
-                                         
-                       
-                         self.compare_methods(iterations,modes_to_use)
+
+                         results = self.compare_methods(iterations=iterations,iterate_over=iterate_over,limited_to=modes_to_use)
+                         self.log_lines(filename='tests.txt',lines=results)
+                                       
+                                       
                     
-                    elif answer == 'r':
+                    elif answer == 'r' and isinstance(iterations,int):
                          
                          self.rank_compare(iterations)
                     else:
@@ -1137,8 +1246,7 @@ tb = top word by frequency from choice words
                          self.saved.append(self.log[-1])
                          print('\nSAVED TO LOG: '+self.log[-1][0]+'\n')
                elif answer in ['q','l']:
-                    print('\nLOG')
-                    print('\n'+self.show_list(self.log)+'\n')
+
                     print('SAVED')
                     print('\n'+self.show_list(self.saved)+'\n')  
                     if answer == 'q':
@@ -1180,10 +1288,8 @@ if __name__ == "__main__":
      while True:
           wordle = Wordle_Solver()
           saved_results = wordle.run()
-          logfile = open('log.txt','at', encoding='utf-8')
-          for line in saved_results:
-               logfile.writelines(line[0]+'\t'+line[2]+'\n')
-          logfile.close()
+          wordle.log_lines(lines=[wordle.language+'\t'+str(wordle.word_length)+'\t'+str(line[0])+'\t'+'<<'+str(line[2])+'>>\n' for line in saved_results])
+          
           
                
                
