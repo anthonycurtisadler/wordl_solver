@@ -159,19 +159,23 @@ tb = top word by frequency from choice words
           """Loads in list of words from textfile"""
 
           self.word_length = word_length
+          self.choose_words = None
 
           if '_NS_' in self.filename:
                new_file_name = self.filename.split('_NS_')[0]+'_S_'+self.filename.split('_NS_')[1]
                solutions = open('wordlists'+os.altsep+new_file_name,'r', encoding='utf-8')
                solutions = solutions.read()
                self.choose_words = [x.strip() for x in solutions.split('\n') if len(x.strip()) == 5]
+               print('THERE ARE ',len(self.choose_words),' SOLUTION WORDS')
               
           if self.textfile:
         
-               self.choose_words = None
+               
                self.words = [x.strip() for x in self.textfile.split(self.split_char)
                                   if len(x.strip()) == word_length and x.strip().lower()==x.strip() and x.strip().isalpha()]
                print('THERE ARE ',len(self.words),' WORDS IN THIS FILE')
+               if self.choose_words:
+                    self.words += self.choose_words
 
           input('PRESS RETURN TO CONTINUE')
           self.histogram = None
@@ -193,9 +197,11 @@ tb = top word by frequency from choice words
           self.use_information = input('DO you want to use result size for mode 1?') in ['yes',' ','YES','Y','y','sure']
           if self.choose_words:
                self.histogram = self.make_histogram(word_list=self.choose_words)
+               self.make_letter_histogram(word_list=self.words)
           else:
                self.histogram = self.make_histogram()
-          self.make_letter_histogram()
+               self.make_letter_histogram()
+          
 
      def make_new_directory (self,
                              directory_name='wordlists'):
@@ -321,7 +327,7 @@ tb = top word by frequency from choice words
           print()
           return histogram
 
-     def make_letter_histogram (self):
+     def make_letter_histogram (self,word_list=None):
 
           """Form a histogram of frequency by individual letters"""
 
@@ -360,7 +366,7 @@ tb = top word by frequency from choice words
 
           
           for position in range(self.word_length):
-               self.letter_histogram[position] = self.make_histogram(by_letter=True,position=position)
+               self.letter_histogram[position] = self.make_histogram(by_letter=True,position=position,word_list=word_list)
                for letter in self.letter_histogram[position]:
                     histo_file.writelines(letter+'/'+str(position)+'\t'+str(self.letter_histogram[position][letter])+'\n')
                     
@@ -389,7 +395,7 @@ tb = top word by frequency from choice words
                found_letters.add(character)
           return total_value/len(set(word))
 
-     def get_best_word_by_information (self, all_words,schema_string=None,already_chosen=None):
+     def get_best_word_by_information (self, all_words,schema_string=None,already_chosen=None, mode=2):
 
           """Returns the word that gives the smallest average result set when tested across all the words"""
 
@@ -409,13 +415,25 @@ tb = top word by frequency from choice words
                for answer_word in sorted(all_words, key=lambda x:-(self.value_word(x)))[0:up_to_here]:
                     
                     results[answer_word] = []
+                    maximum = 0
                     for try_word in all_words:
                          solved, schema = self.compare_word (try_word, answer_word)
-                         results[answer_word].append(self.get_possible_words(try_word,all_words,schema,length_only=True))
-                    average = sum(results[answer_word])/len(results[answer_word])
-                    deviation = sum([abs(average-x) for x in results[answer_word]])/len(results[answer_word])
-                    
-                    results[answer_word] = average + deviation
+                         gotten_length = self.get_possible_words(try_word,all_words,schema,length_only=True)
+                         results[answer_word].append(gotten_length)
+                         if gotten_length>maximum:
+                              maximum = gotten_length
+                              
+                   
+
+                    if mode == 0:
+                         average = sum(results[answer_word])/len(results[answer_word])
+                         results[answer_word] = average
+                    elif mode == 1:
+                         results[answer_word] = maximum
+                    else:
+                         average = sum(results[answer_word])/len(results[answer_word])
+                         results[answer_word] = (int(average),maximum)
+                         
 ##                    print(answer_word,' avr:',int(average),'dev:',int(deviation),'total:',
 ##                          int(results[answer_word]),'freq:',
 ##                          self.value_word(answer_word),'freq by char:',self.value_word_by_char(answer_word))
@@ -1125,6 +1143,7 @@ tb = top word by frequency from choice words
                
 
                if answer in ['c','r','w']:
+ 
                     while True:
                          iterations = input('How many iterations or RETURN to use entire wordset? ')
                          if iterations.isnumeric() or (answer=='c' and not iterations):
@@ -1135,6 +1154,7 @@ tb = top word by frequency from choice words
                               iterate_over = self.choose_words
                          else:
                               iterate_over = self.words
+                         print('ITERATING OVER ',len(iterate_over),' WORDS!')
                     else:
                          iterate_over = None
                          iterations = int(iterations)
