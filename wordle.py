@@ -59,8 +59,10 @@ class Wordle_Solver:
                           3:'[60]rb',
                           4:'[120]ra',
                           5:'[120]*rb',
-                          6:'{arise}[60]xa',
-                          7:'1000.[60]ra;ta'}
+                          6:'[60]xa',
+                          7:'1000.[60]ra;ta',
+                          8:'[120]**rb'}
+                          
                                   
           self.scripts = copy.deepcopy(self.script_defaults)
 
@@ -91,6 +93,7 @@ ALL may include a STRATEGY CODE and an optional DIVIDER, in square brackets
 
 STRATEGY CODES INCLUDE:
 
+~ = to get least frequent rather than most 
 * = to use frequency by char 
 i = get best word by the least average size
      of the subsequent groups it generates (=information)
@@ -380,7 +383,8 @@ tb = top word by frequency from choice words
           total_value = 0
           for character in set(word):
                total_value += self.histogram[character]
-          return total_value / self.word_length
+          total = total_value / self.word_length
+          return total
 
      def value_word_by_char (self,word):
 
@@ -392,14 +396,24 @@ tb = top word by frequency from choice words
           for position, character in enumerate(word):
                if character  not in found_letters:
                     total_value += self.letter_histogram[position][character]
-               found_letters.add(character)
-          return total_value/len(set(word))
+                    found_letters.add(character)
+          total = total_value/len(set(word))
+          return total
 
-     def get_best_word_by_information (self, all_words,schema_string=None,already_chosen=None, mode=2):
+     def compound_values (self,word):
+
+          """Combines application of value_word and value_by_char"""
+
+          return int(self.value_word(word))+self.value_word_by_char(word)
+     
+          
+
+     def get_best_word_by_information (self, all_words,choice_words=None,schema_string=None,already_chosen=None, mode=0):
 
           """Returns the word that gives the smallest average result set when tested across all the words"""
 
-         
+          if not choice_words:
+               choice_words = all_words 
           
           if schema_string is None:
                schema_string = '_'*self.word_length
@@ -411,14 +425,14 @@ tb = top word by frequency from choice words
                up_to_here = int(len(all_words)**(1/3))
                
                results = {}
-               
+               print(len(all_words))
                for answer_word in sorted(all_words, key=lambda x:-(self.value_word(x)))[0:up_to_here]:
                     
                     results[answer_word] = []
                     maximum = 0
                     for try_word in all_words:
                          solved, schema = self.compare_word (try_word, answer_word)
-                         gotten_length = self.get_possible_words(try_word,all_words,schema,length_only=True)
+                         gotten_length = self.get_possible_words(try_word,choice_words,schema,length_only=True)
                          results[answer_word].append(gotten_length)
                          if gotten_length>maximum:
                               maximum = gotten_length
@@ -426,7 +440,7 @@ tb = top word by frequency from choice words
                    
 
                     if mode == 0:
-                         average = sum(results[answer_word])/len(results[answer_word])
+                         average = sum(results[answer_word])
                          results[answer_word] = average
                     elif mode == 1:
                          results[answer_word] = maximum
@@ -439,7 +453,7 @@ tb = top word by frequency from choice words
 ##                          self.value_word(answer_word),'freq by char:',self.value_word_by_char(answer_word))
                if not already_chosen and not self.saved_results:
                     self.saved_results = results
-          ordered_results = sorted([x for x in results.keys() if x not in already_chosen],key = lambda x:results[x])
+          ordered_results = sorted([x for x in results.keys() if x not in already_chosen and x in choice_words],key = lambda x:results[x])
           least_value = results[ordered_results[0]]
           
           pos = 0
@@ -653,7 +667,8 @@ tb = top word by frequency from choice words
           if header:
                print('\n'+header)
           already_chosen = set()
-          all_words = list(self.words)
+          all_words = self.words 
+               
           
 
           counter = 1
@@ -709,7 +724,7 @@ tb = top word by frequency from choice words
                return try_this
 
 
-          def solve_mode (all_words=None,script='r',schema_string=None,already_chosen=None,rank_position=None):
+          def solve_mode (all_words=None,script='r',schema_string=None,already_chosen=None,rank_position=None, count=None):
 
                """For solving by applying automatic strategies"""
 
@@ -717,14 +732,17 @@ tb = top word by frequency from choice words
                outside =lambda x,y,z: x.split(y)[0]+x.split(z)[1]
 
 
-               def solve_phrase (all_words=None,phrase='r',schema_string=None,already_chosen=None,rank_position=None):
+               def solve_phrase (all_words=None,phrase='r',schema_string=None,already_chosen=None,rank_position=None,count=None):
 
                     """Interprets the phrase expressing the solving method"""
 
-                    if '{' in phrase and '}' in phrase:
-                         if len(all_words) == len(self.words):
-                              try_this = extract(phrase,'{','}')
-                              return try_this
+
+                    if '$' in phrase:
+                         all_words = [x for x in all_words if x in self.choose_words]
+                    if '{' in phrase and '}' in phrase and count==1:
+                         
+                         try_this = extract(phrase,'{','}')
+                         return try_this
                          
                          
                     if '[' in phrase and ']' in phrase:
@@ -737,17 +755,44 @@ tb = top word by frequency from choice words
 
                     value_function = self.value_word
 
-                    if '*' in phrase:
-                         value_function = self.value_word_by_char  
+                    if '~' in phrase:
+                         sign = 1
+                    else:
+                         sign = -1
+
+                    if '**' in phrase:
+                         value_function = self.compound_values 
+
+                    elif '*' in phrase:
+                         value_function=  self.value_word_by_char
+                    self.value_word_by_char
                          
                     if 'i' in phrase:
+                         choice_words = None
+                         if not self.choose_words:
+                              choice_words = all_words
+
+                         else:
+                              choice_words = [x for x in all_words if x in self.choose_words]
+                              
+                         
                          if self.histogram and self.use_information:
-                              try_this = self.get_best_word_by_information(list(all_words),schema_string=last_schema_string,already_chosen=already_chosen)
+                              if 'a' in phrase:
+                                   try_this = self.get_best_word_by_information(choice_words,
+                                                                                choice_words=choice_words,
+                                                                                schema_string=last_schema_string,
+                                                                                already_chosen=already_chosen)
+                              else:
+                                   
+                                   try_this = self.get_best_word_by_information(all_words,
+                                                                                choice_words=choice_words,
+                                                                                schema_string=last_schema_string,
+                                                                                already_chosen=already_chosen)
                          else:
                               try_this = random.choice(all_words)
                          return try_this
                     elif 'c' in phrase:
-                         all_words = sorted(all_words,key=lambda x:-(value_function(x)))
+                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x)))
                          top_value = value_function(all_words[0])
                          pos = 0
                          for pos, w in enumerate(all_words):
@@ -756,6 +801,7 @@ tb = top word by frequency from choice words
                          try_this = random.choice(all_words[0:pos+1])
                          return try_this
                     elif 'f' in phrase:
+                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x)))
                          try_this = all_words[int(len(all_words)*rank_position)]
                          return try_this
                     elif 'r' in phrase and not 'a' in phrase and not 'b' in phrase:
@@ -769,9 +815,9 @@ tb = top word by frequency from choice words
                     elif 'x' in phrase and not 'a' in phrase and not 'b' in phrase:
                          try_this = random.choice(all_words[0:int(self.function(len(all_words)))])
                     elif 'a' in phrase and self.choose_words:
-                         all_words = [x for x in sorted(all_words,key=lambda x:-(value_function(x))) if x in self.choose_words]
+                         all_words = [x for x in sorted(all_words,key=lambda x:sign*(value_function(x))) if x in self.choose_words]
                     elif 'b' in phrase:
-                         all_words = sorted(all_words,key=lambda x:-(value_function(x)))
+                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x)))
                     if 'r' in phrase or 'x' in phrase:
                          up_to_here = int(len(all_words)/divider)+add_to
                          if up_to_here == 0:
@@ -790,17 +836,18 @@ tb = top word by frequency from choice words
                                         
                     else:
                          return all_words[0]         
-                         
+                    #END OF SOLVE_PHRASE FUNCTION    
                     
                          
 
                if ';' not in script:
-                    y =solve_phrase(all_words=all_words,phrase=script,schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position)
+                    
+                    y =solve_phrase(all_words=all_words,phrase=script,schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position,count=count)
                     return y,script
                
                     
                elif not script:
-                    return solve_phrase(all_words=all_words,phrase='r',schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position),script
+                    return solve_phrase(all_words=all_words,phrase='r',schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position,count=count),script
                else:
 
                     while (';' in script
@@ -814,7 +861,7 @@ tb = top word by frequency from choice words
                          
                     phrase = script.split(';')[0]
                     script = ';'.join(script.split(';')[1:])
-                    return solve_phrase(all_words=all_words,phrase=phrase,schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position),script
+                    return solve_phrase(all_words=all_words,phrase=phrase,schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position,count=count),script
                     
           if script is None:
 
@@ -837,7 +884,8 @@ tb = top word by frequency from choice words
                                                   script = script,
                                                   schema_string=last_schema_string,
                                                   already_chosen=already_chosen,
-                                                  rank_position=rank_position)
+                                                  rank_position=rank_position,
+                                                  count=counter)
 
 
 
