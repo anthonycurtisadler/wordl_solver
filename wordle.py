@@ -53,15 +53,15 @@ class Wordle_Solver:
 
      
 
-          self.script_defaults = {0:'f',
-                          1:'c',
-                          2:'[60]ra',
-                          3:'[60]rb',
+          self.script_defaults = {0:'a',
+                          1:'*a',
+                          2:'**a',
+                          3:'[60]ra',
                           4:'[120]ra',
-                          5:'[120]*rb',
-                          6:'[60]xa',
-                          7:'1000.[60]ra;ta',
-                          8:'[120]**rb'}
+                          5:'f',
+                          6:'*f',
+                          7:'**f',
+                          8:'~a'}
                           
                                   
           self.scripts = copy.deepcopy(self.script_defaults)
@@ -93,19 +93,25 @@ ALL may include a STRATEGY CODE and an optional DIVIDER, in square brackets
 
 STRATEGY CODES INCLUDE:
 
-~ = to get least frequent rather than most 
-* = to use frequency by char 
-i = get best word by the least average size
-     of the subsequent groups it generates (=information)
-c = choose randomly from the group of words with highest frequency value
-f = choose by frequency rank
-r = choose word randomly from the top 1/DIVIDER of words 
-x = choose word randomly from the top words, but applying formula (default = square root)
+
+* =  to use only frequency by letter in word
+** = to use only frequency by letter in exact position
+i  = get best word by the least average size
+     of the subsequent groups it generates
+a  = rank words by frequency but choose only from the smaller set of words to choose 
+b  = rank words by frequency but use any word
+c  = choose randomly from the group of words with highest frequency value
+f  = choose by top RANK% of words ordered by frequency
+r  = choose word randomly from the top 1/DIVIDER of words if ordered
+x  = choose word randomly from the top slice of words determined by applying formula to total number of words
+     Defaults to SQRT. 
 r and x can be combined with a and b, or used alone.
-a = rank words by frequency but choose only from the smaller set of words to choose 
-b = rank words by frequency but use any word
+
 ta = top word by frequency
 tb = top word by frequency from choice words
+     [the 't' can be ommited]
+
+~  = to get least frequent rather than most 
 
 #. at beginning of STRATEGY to indicate the cut off in the size of the words for the strategy to be applicable.
 
@@ -162,7 +168,7 @@ tb = top word by frequency from choice words
           """Loads in list of words from textfile"""
 
           self.word_length = word_length
-          self.choose_words = None
+          self.choose_words = []
 
           if '_NS_' in self.filename:
                new_file_name = self.filename.split('_NS_')[0]+'_S_'+self.filename.split('_NS_')[1]
@@ -200,7 +206,7 @@ tb = top word by frequency from choice words
           self.use_information = input('DO you want to use result size for mode 1?') in ['yes',' ','YES','Y','y','sure']
           if self.choose_words:
                self.histogram = self.make_histogram(word_list=self.choose_words)
-               self.make_letter_histogram(word_list=self.words)
+               self.make_letter_histogram(word_list=self.choose_words)
           else:
                self.histogram = self.make_histogram()
                self.make_letter_histogram()
@@ -221,8 +227,8 @@ tb = top word by frequency from choice words
                 return_text = 'NEW FOLDER CREATED: '+directory_name
             except:
                 return_text = 'NEW FOLDER CREATION FAILED'
-
-        print (return_text)             
+        if return_text:
+             print (return_text)             
 
      def get_answer (self):
 
@@ -233,17 +239,19 @@ tb = top word by frequency from choice words
           else:
                return random.choice(self.words) 
 
-     def make_histogram (self,by_letter=False,position=0, word_list=None):
+     def make_histogram (self,by_letter=False,position=0, word_list=None,histo_object=None):
 
           """Forms a histogram of the letters of the alphabet by frequency"""
           self.make_new_directory('frequencylists')
+          if not histo_object:
+                    histo_object = {}
           
           if word_list is None:
                word_list = self.words
 
-          if not by_letter:
-               histogram = {}
 
+          if not by_letter and (len(word_list) in (len(self.words),len(self.choose_words))):
+               
                hist_textfile = self.filename.split('.')[0]+'freq'+str(self.word_length)+'.txt'
                
                histo_file = None
@@ -261,150 +269,169 @@ tb = top word by frequency from choice words
                          if '\t' in line:
                               letter, value = line.split('\t')[0].strip(),line.split('\t')[1].strip()
                               if '/' not in letter:
-                                   histogram[letter] = float(value)
+                                   histo_object[letter] = float(value)
                               else:
                                    letter, pos = key.split('/')[0].strip(), key.split('/')[1].strip()
                                    if pos == position:
-                                        histogram[letter] = float(value)
+                                        histo_object[letter] = float(value)
                     histo_file.close()
                     
-                    return histogram
+                    return histo_object
                if not histo_file is None:
                     histo_file.close()
                
           
-                         
-          
-
-          print("MAKING A HISTOGRAM FOR "+self.filename)
-          print("THIS MAY TAKE A FEW MINUTES!!")
-          
+                    
           
           
 
-          total_characters = 0
-          histogram = {}
-
+          total_characters = 0 
           if not by_letter:
-               total_size = len(word_list) * len(word_list[0])
+
+
+               total_number_of_words = len(word_list)
+               all_letters = set()
                for word in word_list:
-                    for character in word:
-                         if character not in histogram:
-                              histogram[character] = 1
-                         else:
-                              histogram[character] = histogram[character]+1
-                         total_characters += 1
-                    if total_characters % 1000==0:
-                         print(total_characters,'/',total_size,end='; ')
+                    all_letters = all_letters.union(set(word))
+
+               for letter in all_letters:
+                    total_with_letter = 0
+                    for word in word_list:
+                         if letter in word:
+                              total_with_letter += 1
+                    histo_object[letter] = total_with_letter/total_number_of_words
+
+
                     
                          
           else:
-
-               total_size = len(word_list)
+               total_number_of_words = len(word_list)
+               all_letters = set()
                for word in word_list:
-                    if word[position] not in histogram:
-                         histogram[word[position]] = 1
-                    else:
-                         histogram[word[position]] = histogram[word[position]]+1
-                    total_characters += 1
-                    if total_characters % 1000==0:
-                         print(total_characters,'/',total_size,end='; ')
-                    
-                         
-          for character in histogram:
-               histogram[character] = histogram[character]/total_characters
+                    all_letters.add(word[position])
+        
+               for letter in all_letters:
+                    total_with_letter = 0
+                    for word in word_list:
+                         if letter == word[position]:
+                              total_with_letter += 1
+                    histo_object[letter] = total_with_letter/total_number_of_words
 
 
-          print('_______________')
-
-          if not by_letter:
+          if not by_letter and (len(word_list) in (len(self.words),len(self.choose_words))):
 
                histo_file = open('frequencylists'+os.altsep+
                                  hist_textfile,'at', encoding='utf-8')
           
-               for chara in histogram:
+               for chara in histo_object:
                     print('SAVING ',chara)
-                    histo_file.writelines(chara+'\t'+str(histogram[chara])+'\n')
+                    histo_file.writelines(chara+'\t'+str(histo_object[chara])+'\n')
                histo_file.close()
                
-          print()
-          return histogram
+          return histo_object
 
-     def make_letter_histogram (self,word_list=None):
+     def make_letter_histogram (self,histo_object=None,word_list=None):
 
           """Form a histogram of frequency by individual letters"""
 
-
-          hist_textfile = self.filename.split('.')[0]+'posfreq'+str(self.word_length)+'.txt'
-          self.letter_histogram = {}
+          if word_list is None:
+               word_list = self.words
           
+          if histo_object is None:
+               self.letter_histogram = {}
+               histo_object = self.letter_histogram
+
+          if (len(word_list) in (len(self.words),len(self.choose_words))):
+               hist_textfile = self.filename.split('.')[0]+'posfreq'+str(self.word_length)+'.txt'
           
-          histo_file = None
-          try:
-               histo_file = open('frequencylists'+os.altsep+hist_textfile,'r', encoding='utf-8')
-               histo_file_text = histo_file.read()
-          except:
-               print("CAN'T READ!!!")
-               histo_file_text = ''
-          if histo_file_text:
-               print('LOADING HISTOGRAM')
+               histo_file = None
+               try:
+                    histo_file = open('frequencylists'+os.altsep+hist_textfile,'r', encoding='utf-8')
+                    histo_file_text = histo_file.read()
+               except:
+                    print("CAN'T READ!!!")
+                    histo_file_text = ''
+               if histo_file_text:
+                    print('LOADING HISTOGRAM')
 
-               for line in histo_file_text.split('\n'):
-                    if '\t' in line:
-                         letter, value = line.split('\t')[0].strip(),line.split('\t')[1].strip()
-                         if '/' in letter:
-                              letter, pos = letter.split('/')[0].strip(), int(letter.split('/')[1].strip())
-                              if not pos in self.letter_histogram:
-                                   self.letter_histogram[pos] = {}
-                              self.letter_histogram[pos][letter] = float(value)
-               histo_file.close()
-               return None 
-                    
-          if not histo_file is None:
-               histo_file.close()
-                    
+                    for line in histo_file_text.split('\n'):
+                         if '\t' in line:
+                              letter, value = line.split('\t')[0].strip(),line.split('\t')[1].strip()
+                              if '/' in letter:
+                                   letter, pos = letter.split('/')[0].strip(), int(letter.split('/')[1].strip())
+                                   if not pos in histo_object:
+                                        histo_object[pos] = {}
+                                   histo_object[pos][letter] = float(value)
+                    histo_file.close()
+                    return None 
+                         
+               if not histo_file is None:
+                    histo_file.close()
+                         
 
-          self.letter_histogram = {}
-          histo_file = open('frequencylists'+os.altsep+hist_textfile,'at', encoding='utf-8')
 
-          
-          for position in range(self.word_length):
-               self.letter_histogram[position] = self.make_histogram(by_letter=True,position=position,word_list=word_list)
-               for letter in self.letter_histogram[position]:
-                    histo_file.writelines(letter+'/'+str(position)+'\t'+str(self.letter_histogram[position][letter])+'\n')
-                    
+               histo_file = open('frequencylists'+os.altsep+hist_textfile,'at', encoding='utf-8')
 
                
+               for position in range(self.word_length):
+                    histo_object[position] = self.make_histogram(by_letter=True,position=position,word_list=word_list)
+                    for letter in histo_object[position]:
+                         histo_file.writelines(letter+'/'+str(position)+'\t'+str(histo_object[position][letter])+'\n')
+             
+          else:
 
-     def value_word (self, word):
+               for position in range(self.word_length):
+                    histo_object[position] = self.make_histogram(by_letter=True,position=position,word_list=word_list)
+               
+
+     def value_word (self,
+                     word,
+                     histo_tuple=None):
 
           """Returns a value indicating total of the frequency of each letter in a word"""
-
+          if histo_tuple is None:
+               histo_object = self.histogram
+          else:
+               histo_object = histo_tuple[0]
           total_value = 0
           for character in set(word):
                total_value += self.histogram[character]
-          total = total_value / self.word_length
-          return total
+          
+          return total_value
 
-     def value_word_by_char (self,word):
+     def value_word_by_char (self,
+                             word,
+                             histo_tuple=None):
 
           """Returns a value indicating the total of the frequency of each letter in a word using
           a histogram that distinguishes frequency by position"""
-
+          if histo_tuple is None:
+               histo_object = self.letter_histogram
+          else:
+               histo_object = histo_tuple[0]
           total_value = 0
-          found_letters = set()
           for position, character in enumerate(word):
-               if character  not in found_letters:
+               if position in self.letter_histogram and character in self.letter_histogram[position]:
                     total_value += self.letter_histogram[position][character]
-                    found_letters.add(character)
-          total = total_value/len(set(word))
-          return total
+          return total_value
 
-     def compound_values (self,word):
+     
+
+     def compound_values (self,
+                          word,
+                          histo_tuple=None):
 
           """Combines application of value_word and value_by_char"""
-
-          return int(self.value_word(word))+self.value_word_by_char(word)
+          if histo_tuple is None:
+               histo_object_one = None
+               histo_object_two = None 
+          else:
+               histo_object_one = histo_tuple[0]
+               histo_object_two = histo_tuple[1]
+               
+          return self.value_word(word,
+                                 histo_tuple=(histo_object_one,))+self.value_word_by_char(word,
+                                                                                    histo_tuple=(histo_object_two,))
      
           
 
@@ -418,42 +445,37 @@ tb = top word by frequency from choice words
           if schema_string is None:
                schema_string = '_'*self.word_length
 
-          if self.saved_results and not already_chosen:
-               results = self.saved_results
-          else:
-               
-               up_to_here = int(len(all_words)**(1/3))
-               
-               results = {}
-               print(len(all_words))
-               for answer_word in sorted(all_words, key=lambda x:-(self.value_word(x)))[0:up_to_here]:
-                    
-                    results[answer_word] = []
-                    maximum = 0
-                    for try_word in all_words:
-                         solved, schema = self.compare_word (try_word, answer_word)
-                         gotten_length = self.get_possible_words(try_word,choice_words,schema,length_only=True)
-                         results[answer_word].append(gotten_length)
-                         if gotten_length>maximum:
-                              maximum = gotten_length
-                              
-                   
 
-                    if mode == 0:
-                         average = sum(results[answer_word])
-                         results[answer_word] = average
-                    elif mode == 1:
-                         results[answer_word] = maximum
-                    else:
-                         average = sum(results[answer_word])/len(results[answer_word])
-                         results[answer_word] = (int(average),maximum)
+          
+          results = {}
+          print(len(all_words))
+          for answer_word in sorted(all_words, key=lambda x:-(self.value_word(x))):
+               
+               results[answer_word] = []
+               maximum = 0
+               for try_word in all_words:
+                    solved, schema = self.compare_word (try_word, answer_word)
+                    gotten_length = self.get_possible_words(try_word,choice_words,schema,length_only=True)
+                    results[answer_word].append(gotten_length)
+                    if gotten_length>maximum:
+                         maximum = gotten_length
                          
-##                    print(answer_word,' avr:',int(average),'dev:',int(deviation),'total:',
-##                          int(results[answer_word]),'freq:',
-##                          self.value_word(answer_word),'freq by char:',self.value_word_by_char(answer_word))
-               if not already_chosen and not self.saved_results:
-                    self.saved_results = results
+              
+
+               if mode == 0:
+                    average = sum(results[answer_word])
+                    results[answer_word] = average
+               elif mode == 1:
+                    results[answer_word] = maximum
+               else:
+                    average = sum(results[answer_word])/len(results[answer_word])
+                    
+                    results[answer_word] = (int(average),maximum)
+
+
+
           ordered_results = sorted([x for x in results.keys() if x not in already_chosen and x in choice_words],key = lambda x:results[x])
+
           least_value = results[ordered_results[0]]
           
           pos = 0
@@ -513,7 +535,11 @@ tb = top word by frequency from choice words
      
                
 
-     def get_possible_words (self, word, all_words, schema,length_only=False):
+     def get_possible_words (self, word, all_words,
+                             schema,length_only=False,
+                             bypass_perfect=False,
+                             bypass_almost=False,
+                             bypass_not_at_all=False):
 
           """Returns all the words from the list that match the schema"""
 
@@ -559,9 +585,9 @@ tb = top word by frequency from choice words
                
 
                for to_check in all_words:
-                    if (apply_to_word(word, to_check, schema[0], fits_perfectly) and
-                        apply_to_word(word, to_check, schema[1], fits_almost) and
-                        apply_to_word(word, to_check, schema[2], fits_not_at_all)):
+                    if ((apply_to_word(word, to_check, schema[0], fits_perfectly) or bypass_perfect) and
+                   (apply_to_word(word, to_check, schema[1], fits_almost) or bypass_almost) and
+                   (apply_to_word(word, to_check, schema[2], fits_not_at_all) or bypass_not_at_all)):
 
                          counter += 1
                return counter 
@@ -569,9 +595,9 @@ tb = top word by frequency from choice words
 
           return_list = []
           for to_check in all_words:
-               if (apply_to_word(word, to_check, schema[0], fits_perfectly) and
-                   apply_to_word(word, to_check, schema[1], fits_almost) and
-                   apply_to_word(word, to_check, schema[2], fits_not_at_all)):
+               if ((apply_to_word(word, to_check, schema[0], fits_perfectly) or bypass_perfect) and
+                   (apply_to_word(word, to_check, schema[1], fits_almost) or bypass_almost) and
+                   (apply_to_word(word, to_check, schema[2], fits_not_at_all) or bypass_not_at_all)):
 
                     return_list.append(to_check)
           return return_list
@@ -657,17 +683,11 @@ tb = top word by frequency from choice words
 
                
 
-          """Solves the to_solve, appling the given mode.
-               Mode 0 = Frequency
-               Mode 1 = Random
-               Mode 2-4 = Random + Frequency 10/20/30
-               Mode 5 = Random + Frequency skimming
-               Mode 6 = Positional Frequency
-               """
-          if header:
+        
+          if printing:
                print('\n'+header)
           already_chosen = set()
-          all_words = self.words 
+          all_words = list(self.words) 
                
           
 
@@ -680,9 +700,11 @@ tb = top word by frequency from choice words
           already_chosen = [] #This is necessary to keep get_word_by_information ending up in an infinite loop
 
 
+
           def with_play_mode (all_words=None):
 
                """For where the user plays the wordl game"""
+               
 
                try_this = 'X'*self.word_length
                print(format_alphabet(exact,almost,not_at_all))
@@ -700,13 +722,13 @@ tb = top word by frequency from choice words
                          print('\n'+', '.join([str(x[0])+': '+x[1] for x in enumerate(all_words)])+'\n')
                     elif try_this == 'h':
                          if to_solve in self.dictionary:
-                              if not hinted:
+                              if not self.hinted:
                                    if '(' in self.dictionary[to_solve] and ')' in self.dictionary[to_solve]:
                                         print(self.dictionary[to_solve].split('(')[1].split(')')[0])
                                    else:
                                         print('No specification')
-                                   hinted = True
-                              elif hinted:
+                                   self.hinted = True
+                              elif self.hinted:
                                    print()
                                    print(show_definition(self.dictionary[to_solve]))
                                    print()
@@ -721,6 +743,7 @@ tb = top word by frequency from choice words
                          print('THIS IS NOT A VALID WORD')
                     elif try_this not in all_words:
                          print("INVALID CHOICE!")
+                    
                return try_this
 
 
@@ -732,11 +755,21 @@ tb = top word by frequency from choice words
                outside =lambda x,y,z: x.split(y)[0]+x.split(z)[1]
 
 
-               def solve_phrase (all_words=None,phrase='r',schema_string=None,already_chosen=None,rank_position=None,count=None):
+               def solve_phrase (all_words=None,phrase='r',schema_string=None,already_chosen=None,rank_position=None,count=None,printing=True):
 
                     """Interprets the phrase expressing the solving method"""
 
-
+                    if counter == 1:
+                         main_histo = self.histogram
+                         letter_histo = self.letter_histogram
+                    else:
+                         main_histo = {}
+                         letter_histo = {}
+                         if printing:
+                              print('   MAKING NEW HISTOGRAM FOR ',len(all_words),' WORDS')
+                         self.make_histogram(word_list=all_words,histo_object=main_histo)
+                         self.make_letter_histogram(word_list=all_words,histo_object=letter_histo)
+                    
                     if '$' in phrase:
                          all_words = [x for x in all_words if x in self.choose_words]
                     if '{' in phrase and '}' in phrase and count==1:
@@ -753,7 +786,8 @@ tb = top word by frequency from choice words
                          divider = 1
                          add_to = 0
 
-                    value_function = self.value_word
+                    value_function = self.compound_values
+                    histo_tuple = (main_histo, letter_histo)
 
                     if '~' in phrase:
                          sign = 1
@@ -761,11 +795,15 @@ tb = top word by frequency from choice words
                          sign = -1
 
                     if '**' in phrase:
-                         value_function = self.compound_values 
-
-                    elif '*' in phrase:
                          value_function=  self.value_word_by_char
-                    self.value_word_by_char
+                         histo_tuple = (letter_histo,)
+                         
+                    
+                    elif '*' in phrase:
+                         
+                         value_function = self.value_word
+                         histo_tuple = (main_histo,)
+               
                          
                     if 'i' in phrase:
                          choice_words = None
@@ -792,16 +830,16 @@ tb = top word by frequency from choice words
                               try_this = random.choice(all_words)
                          return try_this
                     elif 'c' in phrase:
-                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x)))
-                         top_value = value_function(all_words[0])
+                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x,histo_tuple=histo_tuple)))
+                         top_value = value_function(all_words[0],histo_tuple=histo_tuple)
                          pos = 0
                          for pos, w in enumerate(all_words):
-                              if value_function(w) < top_value:
+                              if value_function(w,histo_tuple=histo_tuple) < top_value:
                                    break
                          try_this = random.choice(all_words[0:pos+1])
                          return try_this
                     elif 'f' in phrase:
-                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x)))
+                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x,histo_tuple=histo_tuple)))
                          try_this = all_words[int(len(all_words)*rank_position)]
                          return try_this
                     elif 'r' in phrase and not 'a' in phrase and not 'b' in phrase:
@@ -815,9 +853,9 @@ tb = top word by frequency from choice words
                     elif 'x' in phrase and not 'a' in phrase and not 'b' in phrase:
                          try_this = random.choice(all_words[0:int(self.function(len(all_words)))])
                     elif 'a' in phrase and self.choose_words:
-                         all_words = [x for x in sorted(all_words,key=lambda x:sign*(value_function(x))) if x in self.choose_words]
+                         all_words = [x for x in sorted(all_words,key=lambda x:sign*(value_function(x,histo_tuple=histo_tuple))) if x in self.choose_words]
                     elif 'b' in phrase:
-                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x)))
+                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x,histo_tuple=histo_tuple)))
                     if 'r' in phrase or 'x' in phrase:
                          up_to_here = int(len(all_words)/divider)+add_to
                          if up_to_here == 0:
@@ -842,12 +880,24 @@ tb = top word by frequency from choice words
 
                if ';' not in script:
                     
-                    y =solve_phrase(all_words=all_words,phrase=script,schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position,count=count)
+                    y =solve_phrase(all_words=all_words,
+                                    phrase=script,
+                                    schema_string=last_schema_string,
+                                    already_chosen=already_chosen,
+                                    rank_position=rank_position,
+                                    count=count,
+                                    printing=printing)
                     return y,script
                
                     
                elif not script:
-                    return solve_phrase(all_words=all_words,phrase='r',schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position,count=count),script
+                    return solve_phrase(all_words=all_words,
+                                        phrase='r',
+                                        schema_string=last_schema_string,
+                                        already_chosen=already_chosen,
+                                        rank_position=rank_position,
+                                        count=count,
+                                        printing=printing),script
                else:
 
                     while (';' in script
@@ -861,17 +911,27 @@ tb = top word by frequency from choice words
                          
                     phrase = script.split(';')[0]
                     script = ';'.join(script.split(';')[1:])
-                    return solve_phrase(all_words=all_words,phrase=phrase,schema_string=last_schema_string,already_chosen=already_chosen, rank_position=rank_position,count=count),script
+                    return solve_phrase(all_words=all_words,
+                                        phrase=phrase,
+                                        schema_string=last_schema_string,
+                                        already_chosen=already_chosen,
+                                        rank_position=rank_position,
+                                        count=count,
+                                        printing=printing),script
                     
           if script is None:
 
-               script = self.scripts[mode]
-               print('SCRIPT=',script)
+               if mode in self.scripts:
+
+                    script = self.scripts[mode]
+               else:
+                    script = 'r'
+               print('SCRIPT = ',script)
 
           while True:
 
                try_this = None
-               hinted = False
+               self.hinted = False 
 
               
                if play_mode:
@@ -905,7 +965,7 @@ tb = top word by frequency from choice words
                     x = ' GUESS #'+str(counter)+' = '+try_this +' '+last_schema_string
                     if not play_mode:
                
-                         print(x)
+                         print(x, end='')
                     else:
                          outcomes.append(x)
                          print('\n'.join(outcomes))
@@ -913,18 +973,25 @@ tb = top word by frequency from choice words
                
 ##               if printing:
 ##                    print(self.show(try_this, schema))
-               if not (play_mode and not hard):
+               if hard:
                     all_words = self.get_possible_words (try_this,all_words, schema)
+
+               
                if try_this in all_words:
                     all_words.pop(all_words.index(try_this))
 
-
+               if self.show_length and len(all_words)>0:
+                    print('THERE ARE ',len(all_words),' REMAINING WORDS')
+               if self.show_words and 0<len(all_words)<100:
+                    print(', '.join(all_words))    
                if solved:
                     to_solve = to_solve.lower()
                     definition = ''
                     if show_definition and (override or mode == max(self.scripts.keys())) and to_solve in self.dictionary:
                          definition = self.dictionary[to_solve]
+                         print()
                          print('\n'+definition+'\n')
+                         
                     self.log.append((to_solve, counter, definition))
                     return counter
                already_chosen.append(try_this)
@@ -981,7 +1048,6 @@ tb = top word by frequency from choice words
           answer = get_answer() 
           
           print('ANSWER = ',answer)
-          print()
           
           self.solve(answer,mode=mode)
 
@@ -1153,6 +1219,9 @@ tb = top word by frequency from choice words
           """Runs main loop"""
 
           self.show_about()
+          self.show_words = False
+          self.show_length = False
+          
           while True:
                
                word_length = input('ENTER WORD LENGTH OR A(analyse)! ')
@@ -1186,11 +1255,17 @@ tb = top word by frequency from choice words
 
                answer  = input('\n\nENTER A '+str(word_length)
                                +' letter word, <ENTER> to choose a random word, (C)ompare, (E)dit modes, set(F)unction, R(ank compare) \n'+
-                               'or (P)lay, or (H)ard play, (L)og,\n (S)ave last, (T)est a single word, (O)ptimize cutoff,\n'+
+                               'or (P)lay, or (H)ard play, (L)og, (S)ave last, \nSho(W) Words, Show Si(Z)e, (T)est a single word, (O)ptimize cutoff,\n'+
                                '  (A)pply schema, or (Q)uit  ').lower()
-               
 
-               if answer in ['c','r','w']:
+               if answer in ['z']:
+                    self.show_length = not self.show_length
+                    print('SHOWING LENGTH '+{False:'OFF',True:'ON'}[self.show_length])
+               
+               if answer in ['w']:
+                    self.show_words = not self.show_words
+                    print('SHOWING WORDS '+{False:'OFF',True:'ON'}[self.show_words])
+               if answer in ['c','r']:
  
                     while True:
                          iterations = input('How many iterations or RETURN to use entire wordset? ')
@@ -1327,23 +1402,22 @@ tb = top word by frequency from choice words
                     except:
                          print('\nERROR!\n')
                elif answer in ['p','h']:
-                    hard = (answer == 'h')
+                    hard_mode = (answer=='h')
                     answer = self.get_answer()
-                    self.solve(to_solve=answer,play_mode=True,hard=hard)
-                    
+                    self.solve(to_solve=answer,play_mode=True,hard=hard_mode)
+             
                elif not answer:
                     answer = self.get_answer()
                     print('ANSWER === ',answer)
                     for m in self.scripts:
 
-                         self.solve(answer,mode=m,header=self.scripts[m])
+                         self.solve(answer,mode=m)
                          
                  
                elif answer in self.words:
                     if len(answer) == word_length:
 
                          for m in self.scripts:
-                              print(self.scripts[m])
                               self.solve(answer,mode=m)
 
 
