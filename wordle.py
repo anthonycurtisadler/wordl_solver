@@ -53,15 +53,17 @@ class Wordle_Solver:
 
      
 
-          self.script_defaults = {0:'a',
-                          1:'*a',
-                          2:'**a',
-                          3:'[60]ra',
-                          4:'[120]ra',
-                          5:'f',
-                          6:'*f',
-                          7:'**f',
-                          8:'~a'}
+          self.script_defaults = {0:'f',
+                          1:'*f',
+                          2:'**f',
+                          3:'$f',
+                          4:'$*f',
+                          5:'$**f',
+                          6:'{tares};i',
+                          7:'{tares};$i',
+                          8:'fr[60]',
+                          9:'~f',
+                          10:'{zylyl};~$i'}
                           
                                   
           self.scripts = copy.deepcopy(self.script_defaults)
@@ -91,31 +93,38 @@ A STRATEGY SCRIPT CONSISTS OF A SERIES OF STRAGIES separated by SEMICOLONS.
 The FIRST STRATEGY may include a WORD to us in curly brackets
 ALL may include a STRATEGY CODE and an optional DIVIDER, in square brackets
 
-STRATEGY CODES INCLUDE:
+STRATEGY CODE CONSISTS OF SEVERAL PARTS
+
+(1) DETERMINANTS 
+
+*          =  to use only frequency by letter in word
+**         =  to use only frequency by letter in exact position
+[no star]  =  to combine both
+~          =  to invert ordering 
+
+(2) ORDERING METHOD
+
+i  = rank words by least average size
+     of the subsequent groups it generates (=entropy)
+f  = rank words by frequency according to function
+
+(3) RESTRICTING METHOD
+
+$  = to limit to words from the "solutions" set 
+s  = gets the "slice" sharing the highest value from the sorting function
 
 
-* =  to use only frequency by letter in word
-** = to use only frequency by letter in exact position
-i  = get best word by the least average size
-     of the subsequent groups it generates
-a  = rank words by frequency but choose only from the smaller set of words to choose 
-b  = rank words by frequency but use any word
-c  = choose randomly from the group of words with highest frequency value
-f  = choose by top RANK% of words ordered by frequency
-r  = choose word randomly from the top 1/DIVIDER of words if ordered
-x  = choose word randomly from the top slice of words determined by applying formula to total number of words
-     Defaults to SQRT. 
-r and x can be combined with a and b, or used alone.
+(4) SELECTING METHOD 
 
-ta = top word by frequency
-tb = top word by frequency from choice words
-     [the 't' can be ommited]
+r   = get a random word from almost the 1/INT "best" words
+     [INT] / TO set value
+p   = get the word at the LENGTH*1/FLOAT index
+     0<=1 [FLOAT] < 1
+t   = get the topmost ranked word
 
-~  = to get least frequent rather than most 
+INT.  = at beginning of strategy to indicate maximum sent on which the given method is to be applied
 
-#. at beginning of STRATEGY to indicate the cut off in the size of the words for the strategy to be applicable.
-
-
+{WORD} = to automatically choose word
 
 
 """
@@ -203,13 +212,14 @@ tb = top word by frequency from choice words
                               self.words.append(word)
           
 
-          self.use_information = input('DO you want to use result size for mode 1?') in ['yes',' ','YES','Y','y','sure']
+         
           if self.choose_words:
                self.histogram = self.make_histogram(word_list=self.choose_words)
                self.make_letter_histogram(word_list=self.choose_words)
           else:
                self.histogram = self.make_histogram()
                self.make_letter_histogram()
+          self.dynamic_wordlist_storage = {}
           
 
      def make_new_directory (self,
@@ -435,7 +445,7 @@ tb = top word by frequency from choice words
      
           
 
-     def get_best_word_by_information (self, all_words,choice_words=None,schema_string=None,already_chosen=None, mode=0):
+     def get_best_word_by_information (self, all_words,subset=None,choice_words=None,schema_string=None,already_chosen=None, mode=0):
 
           """Returns the word that gives the smallest average result set when tested across all the words"""
 
@@ -448,42 +458,60 @@ tb = top word by frequency from choice words
 
           
           results = {}
-          print(len(all_words))
-          for answer_word in sorted(all_words, key=lambda x:-(self.value_word(x))):
+          if not already_chosen:
+               already_chosen = []
+          if subset is None:
+               subset = all_words
+               getting_entropy = False
+          else:
+               getting_entropy = True
+          
+
+          counter = 0
+          for answer_word in subset:
+               if counter%50 ==0 and len(all_words)>1000:
+                    print(counter, answer_word, end=' ')
+               counter += 1
                
-               results[answer_word] = []
-               maximum = 0
+               
+               results[answer_word] = {}
+               temp_histo_dict = {}
                for try_word in all_words:
                     solved, schema = self.compare_word (try_word, answer_word)
-                    gotten_length = self.get_possible_words(try_word,choice_words,schema,length_only=True)
-                    results[answer_word].append(gotten_length)
-                    if gotten_length>maximum:
-                         maximum = gotten_length
-                         
-              
-
-               if mode == 0:
-                    average = sum(results[answer_word])
-                    results[answer_word] = average
-               elif mode == 1:
-                    results[answer_word] = maximum
-               else:
-                    average = sum(results[answer_word])/len(results[answer_word])
+                    schema = self.show(try_word,schema)
                     
-                    results[answer_word] = (int(average),maximum)
+                    if schema in temp_histo_dict:
+                         temp_histo_dict[schema] += 1
+                    else:
+                         temp_histo_dict[schema] = 1
+                    
+               total_size = len(all_words)
 
 
+##               total = sum([x for x in temp_histo_dict.values()])
+##               average = total/len(temp_histo_dict)
+##               deviation = (sum([abs(average-temp_histo_dict[x]) for x in temp_histo_dict]))/len(temp_histo_dict)
+##               
+####
+####           
+##               
+               entropy =  sum([(x/total_size)*math.log2(x/total_size) for x in temp_histo_dict.values()])
 
+               results[answer_word]=entropy
+##               results[answer_word] = deviation
+               
+          if len(all_words)>1000:
+               print()
+          
+
+               
+
+          if getting_entropy:
+               return subset[0], results[subset[0]]
           ordered_results = sorted([x for x in results.keys() if x not in already_chosen and x in choice_words],key = lambda x:results[x])
 
-          least_value = results[ordered_results[0]]
-          
-          pos = 0
-          for pos, w in enumerate(ordered_results):
-               if results[w] > least_value:
-                    break
-          
-          return random.choice(ordered_results[0:pos+1])
+
+          return ordered_results 
 
           
 
@@ -493,7 +521,7 @@ tb = top word by frequency from choice words
           """Compares one A to another B and returns a boolean value (True if they are identical) and
           a schema in the form of a tuple indicating the match between the two words:
                (1) list of positions in A that match perfectly.
-               (2) list of positions in B where the letter is found in B
+               (2) list of positions in A where the letter is found in B
                (3) list of positions in A that don't match at all.
 
                For example: word A=cat, word b=tab
@@ -578,6 +606,7 @@ tb = top word by frequency from choice words
                     if not function(word_a[pos],pos,word_b):
                          return False
                return True
+                    
 
           if length_only:
 
@@ -600,6 +629,7 @@ tb = top word by frequency from choice words
                    (apply_to_word(word, to_check, schema[2], fits_not_at_all) or bypass_not_at_all)):
 
                     return_list.append(to_check)
+
           return return_list
 
      def show (self, word, schema):
@@ -619,9 +649,13 @@ tb = top word by frequency from choice words
      
                
 
-     def solve (self,to_solve,mode=1,script=None,printing=True,play_mode = False, hard=None, header='',show_definition=True,rank_position=0,first_word='',cut_off=300):
+     def solve (self,to_solve='',mode=1,script=None,printing=True,play_mode = False, hard=None, header='',show_definition=True,rank_position=0,first_word='',cut_off=300, fetch=False):
 
           """Basic routine for solving a wordl, applying different approaches"""
+
+
+          
+               
           if hard is None:
                hard = self.hard
           
@@ -747,7 +781,7 @@ tb = top word by frequency from choice words
                return try_this
 
 
-          def solve_mode (all_words=None,script='r',schema_string=None,already_chosen=None,rank_position=None, count=None):
+          def solve_mode (all_words=None,script='r',schema_string=None,already_chosen=None,rank_position=None, count=None, return_all=False):
 
                """For solving by applying automatic strategies"""
 
@@ -755,7 +789,14 @@ tb = top word by frequency from choice words
                outside =lambda x,y,z: x.split(y)[0]+x.split(z)[1]
 
 
-               def solve_phrase (all_words=None,phrase='r',schema_string=None,already_chosen=None,rank_position=None,count=None,printing=True):
+               def solve_phrase (all_words=None,
+                                 phrase='r',
+                                 schema_string=None,
+                                 already_chosen=None,
+                                 rank_position=None,
+                                 count=None,
+                                 printing=True,
+                                 return_all=False):
 
                     """Interprets the phrase expressing the solving method"""
 
@@ -786,14 +827,20 @@ tb = top word by frequency from choice words
                          divider = 1
                          add_to = 0
 
-                    value_function = self.compound_values
-                    histo_tuple = (main_histo, letter_histo)
+                    if '<' in phrase and '>' in phrase:
+                         rank_position = float(extract(phrase,'<','>'))
+                         phrase = outside(phrase,'<','>')
+                         if not 0<=rank_position<1:
+                              rank_position = 0
 
-                    if '~' in phrase:
-                         sign = 1
-                    else:
-                         sign = -1
+                    if not rank_position:
+                         rank_position = 0
+                         
+                         
 
+
+
+                    #To determine function 
                     if '**' in phrase:
                          value_function=  self.value_word_by_char
                          histo_tuple = (letter_histo,)
@@ -803,9 +850,24 @@ tb = top word by frequency from choice words
                          
                          value_function = self.value_word
                          histo_tuple = (main_histo,)
-               
+                    else:
+                         value_function = self.compound_values
+                         histo_tuple = (main_histo, letter_histo)
+
+                    if '$' in phrase:
+                         limit_to = self.choose_words
+                    else:
+                         limit_to = self.words 
+
+                    #TO GET THE SET OF WORDS 
                          
-                    if 'i' in phrase:
+                    
+
+                    if 'f' in phrase:
+                         all_words = [x for x in sorted(all_words,key=lambda x:-1*(value_function(x,histo_tuple=histo_tuple))) if x in limit_to]
+                         
+
+                    elif 'i' in phrase:
                          choice_words = None
                          if not self.choose_words:
                               choice_words = all_words
@@ -814,49 +876,35 @@ tb = top word by frequency from choice words
                               choice_words = [x for x in all_words if x in self.choose_words]
                               
                          
-                         if self.histogram and self.use_information:
-                              if 'a' in phrase:
-                                   try_this = self.get_best_word_by_information(choice_words,
-                                                                                choice_words=choice_words,
-                                                                                schema_string=last_schema_string,
-                                                                                already_chosen=already_chosen)
-                              else:
-                                   
-                                   try_this = self.get_best_word_by_information(all_words,
-                                                                                choice_words=choice_words,
-                                                                                schema_string=last_schema_string,
-                                                                                already_chosen=already_chosen)
+                         if '$' in phrase:
+                              all_words = self.get_best_word_by_information(choice_words,
+                                                                           choice_words=choice_words,
+                                                                           schema_string=last_schema_string,
+                                                                           already_chosen=already_chosen)
                          else:
-                              try_this = random.choice(all_words)
-                         return try_this
-                    elif 'c' in phrase:
-                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x,histo_tuple=histo_tuple)))
+                              
+                             all_words = self.get_best_word_by_information(all_words,
+                                                                           choice_words=None,
+                                                                           schema_string=last_schema_string,
+                                                                           already_chosen=already_chosen)
+
+                    if '~' in phrase:
+                         all_words = list(reversed(all_words))
+                         
+                    
+                         
+                    if 's' in phrase:
+                         
                          top_value = value_function(all_words[0],histo_tuple=histo_tuple)
                          pos = 0
                          for pos, w in enumerate(all_words):
-                              if value_function(w,histo_tuple=histo_tuple) < top_value:
+                              if (('$' not in phrase and value_function(w,histo_tuple=histo_tuple) < top_value)
+                                  or ('$' in phrase and value_function(w,histo_tuple=histo_tuple) > top_value)):
                                    break
-                         try_this = random.choice(all_words[0:pos+1])
-                         return try_this
-                    elif 'f' in phrase:
-                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x,histo_tuple=histo_tuple)))
-                         try_this = all_words[int(len(all_words)*rank_position)]
-                         return try_this
-                    elif 'r' in phrase and not 'a' in phrase and not 'b' in phrase:
-                         up_to_here = int(len(all_words)/divider)+add_to
-                         if up_to_here == 0:
-                              up_to_here = 1
-                         if up_to_here > len(all_words):
-                              up_to_here = len(all_words)
-                         try_this = random.choice(all_words[0:up_to_here])
-                         return try_this
-                    elif 'x' in phrase and not 'a' in phrase and not 'b' in phrase:
-                         try_this = random.choice(all_words[0:int(self.function(len(all_words)))])
-                    elif 'a' in phrase and self.choose_words:
-                         all_words = [x for x in sorted(all_words,key=lambda x:sign*(value_function(x,histo_tuple=histo_tuple))) if x in self.choose_words]
-                    elif 'b' in phrase:
-                         all_words = sorted(all_words,key=lambda x:sign*(value_function(x,histo_tuple=histo_tuple)))
-                    if 'r' in phrase or 'x' in phrase:
+                         all_words = all_words[0:pos]
+                         
+
+                    if 'r' in phrase:
                          up_to_here = int(len(all_words)/divider)+add_to
                          if up_to_here == 0:
                               up_to_here = 1
@@ -864,18 +912,20 @@ tb = top word by frequency from choice words
                               up_to_here = len(all_words)
                               
                          try_this = random.choice(all_words[0:up_to_here])
-                         return try_this
-                    elif 't' in phrase:
+                    elif 'p' in phrase: #F for by percentage
+                         try_this = all_words[int(len(all_words)*rank_position)]
+                    else:
                          try_this = all_words[0]
-                         return try_this 
+
+                    if not return_all:
+                         return try_this
+                    return all_words
      
                          
-                                                  
-                                        
-                    else:
-                         return all_words[0]         
+                                                   
                     #END OF SOLVE_PHRASE FUNCTION    
                     
+              
                          
 
                if ';' not in script:
@@ -886,7 +936,8 @@ tb = top word by frequency from choice words
                                     already_chosen=already_chosen,
                                     rank_position=rank_position,
                                     count=count,
-                                    printing=printing)
+                                    printing=printing,
+                                    return_all=return_all)
                     return y,script
                
                     
@@ -897,7 +948,8 @@ tb = top word by frequency from choice words
                                         already_chosen=already_chosen,
                                         rank_position=rank_position,
                                         count=count,
-                                        printing=printing),script
+                                        printing=printing,
+                                        return_all=return_all),script
                else:
 
                     while (';' in script
@@ -918,6 +970,14 @@ tb = top word by frequency from choice words
                                         rank_position=rank_position,
                                         count=count,
                                         printing=printing),script
+
+          if fetch:
+                    return solve_mode(all_words=all_words,
+                                      script = script,
+                                      schema_string=None,
+                                      already_chosen=None,
+                                      rank_position=None,
+                                      return_all=True)
                     
           if script is None:
 
@@ -1256,7 +1316,7 @@ tb = top word by frequency from choice words
                answer  = input('\n\nENTER A '+str(word_length)
                                +' letter word, <ENTER> to choose a random word, (C)ompare, (E)dit modes, set(F)unction, R(ank compare) \n'+
                                'or (P)lay, or (H)ard play, (L)og, (S)ave last, \nSho(W) Words, Show Si(Z)e, (T)est a single word, (O)ptimize cutoff,\n'+
-                               '  (A)pply schema, or (Q)uit  ').lower()
+                               '  (A)pply schema, or (Q)uit, (G)et entropy, or (D)ISPLAY ALL WORDS  ').lower()
 
                if answer in ['z']:
                     self.show_length = not self.show_length
@@ -1326,6 +1386,29 @@ tb = top word by frequency from choice words
                                    break
                               except:
                                    print('FUNCTION failed')
+               elif answer == 'g':
+                    if self.choose_words:
+                         print('CHOICE')
+                         print(self.get_best_word_by_information(self.choose_words,subset=[input('word?')]))
+                    else:
+                         print(self.get_best_word_by_information(self.words,subset=[input('word?')]))
+               elif answer == 'd':
+
+                    inp = input('ENTER SCRIPT')
+                    up_to = input('UP TO, RETURN for the first WORD, or DASH for ALL?')
+                    if up_to == '-':
+                         up_to = -1
+                    try:
+                         up_to = int(up_to)
+                    except:
+                         up_to = 0
+
+
+                    if up_to >= 0:
+                         print(', '.join([str(x[0])+' : '+x[1] for x in enumerate(self.solve(script=inp,fetch=True)[0][0:up_to])]))
+                              
+                    else:
+                         print(', '.join([str(x[0])+' : '+x[1] for x in enumerate(self.solve(script=inp,fetch=True)[0])]))
 
                elif answer == 'e':
           
