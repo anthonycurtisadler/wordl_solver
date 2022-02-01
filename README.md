@@ -28,8 +28,8 @@ STRATEGY CODE CONSISTS OF SEVERAL PARTS
 
 (1) DETERMINANTS 
 
-*          =  to use only frequency by letter in word
-**         =  to use only frequency by letter in exact position
+STAR (*)         =  to use only frequency by letter in word
+STAR STAR (**)   =  to use only frequency by letter in exact position
 [no star]  =  to combine both
 ~          =  to invert ordering 
 
