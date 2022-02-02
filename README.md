@@ -61,3 +61,31 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 
 Using the standard wordle list of words, {tares};$i and {alter};$i yield an average of around 3.6 guesses.
 
+
+THE FOLLOWING IS THE RESULTS FROM RUNNING ALL THE PRE-DEFINED SOLVING METHODS AGAINST THE STANDARD WORDLE WORD SET
+
+
+ 1/*f = 4.698488120950324
+HISTOGRAM <1> 2=28, 3=331, 4=836, 5=615, 6=283, 7=126, 8=59, 9=20, 10=12, 11=3, 12=2
+
+ 2/**f = 4.866090712742981
+HISTOGRAM <2> 2=25, 3=282, 4=723, 5=655, 6=377, 7=149, 8=64, 9=24, 10=10, 11=3, 12=3
+
+ 3/$f = 3.7900647948164146
+HISTOGRAM <3> 1=1, 2=132, 3=823, 4=899, 5=346, 6=89, 7=21, 8=3, 9=1
+
+ 4/$*f = 3.8099352051835855
+HISTOGRAM <4> 1=1, 2=133, 3=788, 4=930, 5=347, 6=89, 7=18, 8=7, 9=2
+
+ 5/$**f = 3.8397408207343413
+HISTOGRAM <5> 1=1, 2=146, 3=752, 4=910, 5=368, 6=110, 7=24, 8=4
+
+ 6/{tares};i = 3.6984881209503238
+HISTOGRAM <6> 2=128, 3=887, 4=943, 5=285, 6=59, 7=10, 8=3
+
+ 7/{tares};$i = 3.6483801295896328
+HISTOGRAM <7> 2=128, 3=922, 4=960, 5=255, 6=42, 7=7, 8=1
+
+ 8/fr[60] = 4.518790496760259
+HISTOGRAM <8> 1=3, 2=50, 3=394, 4=857, 5=592, 6=248, 7=105, 8=42, 9=15, 10=6, 11=2, 12=1
+
