@@ -61,10 +61,11 @@ class Wordle_Solver:
                           5:'$**f',
                           6:'{tares};i',
                           7:'{tares};$i',
-                          8:'fr[60]',
-                          9:'~f',
-                          10:'{zylyl};~$i'}
-                          
+                          8:'fr[60]'}
+##          ,
+##                          9:'~f',
+##                          10:'{zylyl};~$i'
+##                          
                                   
           self.scripts = copy.deepcopy(self.script_defaults)
 
@@ -166,11 +167,7 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                     #To find the character dividing the words in the file
           return filename, textfile, split_char, language  
                
-               
-
           
-          
-               
 
      def constitute (self,word_length):
 
@@ -253,7 +250,7 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 
           """Forms a histogram of the letters of the alphabet by frequency"""
           self.make_new_directory('frequencylists')
-          if not histo_object:
+          if histo_object is None:
                     histo_object = {}
           
           if word_list is None:
@@ -373,7 +370,7 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                                         histo_object[pos] = {}
                                    histo_object[pos][letter] = float(value)
                     histo_file.close()
-                    return None 
+                    return histo_object
                          
                if not histo_file is None:
                     histo_file.close()
@@ -392,11 +389,14 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 
                for position in range(self.word_length):
                     histo_object[position] = self.make_histogram(by_letter=True,position=position,word_list=word_list)
+          return histo_object
                
 
      def value_word (self,
                      word,
                      histo_tuple=None):
+
+          
 
           """Returns a value indicating total of the frequency of each letter in a word"""
           if histo_tuple is None:
@@ -405,7 +405,8 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                histo_object = histo_tuple[0]
           total_value = 0
           for character in set(word):
-               total_value += self.histogram[character]
+               if character in histo_object:
+                    total_value += histo_object[character]
           
           return total_value
 
@@ -421,8 +422,8 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                histo_object = histo_tuple[0]
           total_value = 0
           for position, character in enumerate(word):
-               if position in self.letter_histogram and character in self.letter_histogram[position]:
-                    total_value += self.letter_histogram[position][character]
+               if position in histo_object and character in histo_object[position]:
+                    total_value += histo_object[position][character]
           return total_value
 
      
@@ -445,7 +446,7 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
      
           
 
-     def get_best_word_by_information (self, all_words,subset=None,choice_words=None,schema_string=None,already_chosen=None, mode=0):
+     def get_best_word_by_information (self, all_words,over_list=None,choice_words=None,schema_string=None,already_chosen=None, mode=0):
 
           """Returns the word that gives the smallest average result set when tested across all the words"""
 
@@ -460,15 +461,16 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
           results = {}
           if not already_chosen:
                already_chosen = []
-          if subset is None:
-               subset = all_words
+          if over_list and len(over_list)==1:
+               getting_entropy = True
+          elif over_list:
                getting_entropy = False
           else:
-               getting_entropy = True
-          
+               over_list = all_words
+               getting_entropy = False          
 
           counter = 0
-          for answer_word in subset:
+          for answer_word in over_list:
                if counter%50 ==0 and len(all_words)>1000:
                     print(counter, answer_word, end=' ')
                counter += 1
@@ -496,6 +498,7 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 ####           
 ##               
                entropy =  sum([(x/total_size)*math.log2(x/total_size) for x in temp_histo_dict.values()])
+               
 
                results[answer_word]=entropy
 ##               results[answer_word] = deviation
@@ -507,7 +510,7 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                
 
           if getting_entropy:
-               return subset[0], results[subset[0]]
+               return over_list[0], results[over_list[0]]
           ordered_results = sorted([x for x in results.keys() if x not in already_chosen and x in choice_words],key = lambda x:results[x])
 
 
@@ -530,20 +533,30 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                
 
           matches, perfect, almost, not_at_all = False, [],[],[]
+          word_a = list(word_a)
+          word_b = list(word_b)
           if word_a == word_b:
                matches = True
                perfect = list(range(len(word_a)))
                
+         
           
           else:
                
                for position in range(len(word_a)):
                     if word_a[position] == word_b[position]:
                          perfect.append(position)
-                         
-                    elif word_a[position] in word_b:
-                              almost.append(position)
-                    else:
+                         word_a[position] = ' '
+                         word_b[position] = ' '
+
+               for position in range(len(word_a)):
+                    if word_a[position] in word_b and not word_a[position]==' ':
+                         word_b = list(''.join(word_b).replace(word_a[position],' '))
+                         word_a[position] = ' '
+                         almost.append(position)
+
+               for position in range(len(word_a)):
+                    if word_a[position] != ' ':
                          not_at_all.append(position)
           return matches, (perfect, almost, not_at_all)
 
@@ -563,11 +576,14 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
      
                
 
-     def get_possible_words (self, word, all_words,
-                             schema,length_only=False,
+     def get_possible_words (self, word,
+                             all_words,
+                             schema,
+                             length_only=False,
                              bypass_perfect=False,
                              bypass_almost=False,
-                             bypass_not_at_all=False):
+                             bypass_not_at_all=False,
+                             test_words=False):
 
           """Returns all the words from the list that match the schema"""
 
@@ -584,7 +600,7 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 
                """True if letter is in the word, but not in the given position"""
 
-               if letter in word and not word[position]==letter:
+               if letter in word and not word[position] == letter:
                     return True
                return False
           def fits_not_at_all (letter, position, word):
@@ -606,17 +622,73 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                     if not function(word_a[pos],pos,word_b):
                          return False
                return True
-                    
 
+          def is_other_word (word_a,word_b, schema):
+               word_a = list(word_a)
+               word_b = list(word_b)
+               found_letters = []
+
+               for position in schema[0]:
+
+                    if word_a[position] != word_b[position]:
+
+                         return False
+                    else:
+                         word_b[position] == ' '
+                         found_letters.append(word_a[position])
+
+
+               for position in schema[1]:
+                    if word_a[position] in word_b and not word_a[position]==word_b[position]:
+                         word_b[word_b.index(word_a[position])] == ' '
+                         found_letters.append(word_a[position])
+                    else:
+
+                         return False
+        
+                    
+               for position in schema[2]:
+                    if word_a[position] in word_b and word_a[position] not in found_letters:
+                         return False
+                    elif word_a[position] in found_letters:
+                         found_letters.pop(found_letters.index(word_a[position]))
+                    
+               return True 
+          def is_test_word (word_a,word_b, schema):
+
+
+               
+               for position in schema[0]:
+
+                    if not word_a[position] == word_b[position]:
+                         return False
+               temp_word_b = list(word_b)
+               for position in schema[0]:
+                    temp_word_b[position] = ' '
+               
+               
+                    
+               for position in schema[1]:
+                    if word_a[position] not in temp_word_b:
+                         return False
+                    else:
+                         for position in range(len(word_a)):
+                              if temp_word_b[position]==word_a[position]:
+                                   temp_word_b[position] = ' '
+                                   break
+                    
+                    
+               return True 
           if length_only:
 
                counter = 0
-               
 
-               for to_check in all_words:
-                    if ((apply_to_word(word, to_check, schema[0], fits_perfectly) or bypass_perfect) and
-                   (apply_to_word(word, to_check, schema[1], fits_almost) or bypass_almost) and
-                   (apply_to_word(word, to_check, schema[2], fits_not_at_all) or bypass_not_at_all)):
+               if test_words and is_test_word(word, to_check, schema):
+
+                    counter += 1
+
+
+               if not test_words and  is_other_word(word, to_check, schema):
 
                          counter += 1
                return counter 
@@ -624,9 +696,13 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 
           return_list = []
           for to_check in all_words:
-               if ((apply_to_word(word, to_check, schema[0], fits_perfectly) or bypass_perfect) and
-                   (apply_to_word(word, to_check, schema[1], fits_almost) or bypass_almost) and
-                   (apply_to_word(word, to_check, schema[2], fits_not_at_all) or bypass_not_at_all)):
+
+
+               if test_words and is_test_word(word, to_check, schema):
+
+                    return_list.append(to_check)
+                    
+               if not test_words and  is_other_word(word, to_check, schema):
 
                     return_list.append(to_check)
 
@@ -721,7 +797,8 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
           if printing:
                print('\n'+header)
           already_chosen = set()
-          all_words = list(self.words) 
+          testing_words = list(self.words)
+          remaining_words = list(self.words)
                
           
 
@@ -781,7 +858,7 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                return try_this
 
 
-          def solve_mode (all_words=None,script='r',schema_string=None,already_chosen=None,rank_position=None, count=None, return_all=False):
+          def solve_mode (testing_words=None,remaining_words=None,script='r',schema_string=None,already_chosen=None,rank_position=None, count=None, return_all=False):
 
                """For solving by applying automatic strategies"""
 
@@ -789,7 +866,8 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                outside =lambda x,y,z: x.split(y)[0]+x.split(z)[1]
 
 
-               def solve_phrase (all_words=None,
+               def solve_phrase (testing_words=None,
+                                 remaining_words=None,
                                  phrase='r',
                                  schema_string=None,
                                  already_chosen=None,
@@ -800,19 +878,44 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 
                     """Interprets the phrase expressing the solving method"""
 
-                    if counter == 1:
-                         main_histo = self.histogram
-                         letter_histo = self.letter_histogram
-                    else:
-                         main_histo = {}
-                         letter_histo = {}
-                         if printing:
-                              print('   MAKING NEW HISTOGRAM FOR ',len(all_words),' WORDS')
-                         self.make_histogram(word_list=all_words,histo_object=main_histo)
-                         self.make_letter_histogram(word_list=all_words,histo_object=letter_histo)
                     
-                    if '$' in phrase:
-                         all_words = [x for x in all_words if x in self.choose_words]
+
+                    if ('i' in phrase  or 'f' in phrase) and 'e' in phrase:
+                         if '$' not in phrase:
+                              testing_words = list(self.words)
+                         else:
+                              testing_words = list(self.choose_words)
+                              
+                    
+                    if counter == 1:
+                         if not 'i' in phrase:
+                         
+                              main_histo = self.histogram
+                              letter_histo = self.letter_histogram
+
+                              if '$' in phrase and self.choose_words:
+                                   testing_words = list(self.choose_words)
+                              else:
+                                   testing_words = list(self.words)
+                         else:
+                              print()
+                              
+                    else:
+                         if not 'i' in phrase:
+                              main_histo = {}
+                              letter_histo = {}
+
+                              if printing:
+                                   print('   MAKING NEW HISTOGRAM FOR ',len(testing_words),' WORDS')
+                              main_histo = self.make_histogram(word_list=remaining_words,histo_object=main_histo)
+                              letter_histo = self.make_letter_histogram(word_list=remaining_words,histo_object=letter_histo)
+                         else:
+                              print()
+
+                    if '$' in phrase and counter > 1:
+                         testing_words = [x for x in testing_words if x in self.choose_words]
+                    
+                    
                     if '{' in phrase and '}' in phrase and count==1:
                          
                          try_this = extract(phrase,'{','}')
@@ -840,86 +943,92 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 
 
 
-                    #To determine function 
-                    if '**' in phrase:
-                         value_function=  self.value_word_by_char
-                         histo_tuple = (letter_histo,)
+                    #To determine function
+                    if 'i' not in phrase:
+                         if '**' in phrase:
+                              value_function=  self.value_word_by_char
+                              histo_tuple = (letter_histo,)
+                              
                          
-                    
-                    elif '*' in phrase:
-                         
-                         value_function = self.value_word
-                         histo_tuple = (main_histo,)
-                    else:
-                         value_function = self.compound_values
-                         histo_tuple = (main_histo, letter_histo)
+                         elif '*' in phrase:
+                              
+                              value_function = self.value_word
+                              histo_tuple = (main_histo,)
+                         else:
+                              value_function = self.compound_values
+                              histo_tuple = (main_histo, letter_histo)
 
-                    if '$' in phrase:
+                    if '$' in phrase and self.choose_words:
                          limit_to = self.choose_words
                     else:
                          limit_to = self.words 
 
                     #TO GET THE SET OF WORDS 
                          
+
                     
 
                     if 'f' in phrase:
-                         all_words = [x for x in sorted(all_words,key=lambda x:-1*(value_function(x,histo_tuple=histo_tuple))) if x in limit_to]
+                         testing_words = [x for x in sorted(testing_words,key=lambda x:-1*(value_function(x,histo_tuple=histo_tuple))) if x in limit_to]
+
+                              
                          
 
                     elif 'i' in phrase:
                          choice_words = None
                          if not self.choose_words:
-                              choice_words = all_words
+                              choice_words = testing_words
 
                          else:
-                              choice_words = [x for x in all_words if x in self.choose_words]
+                              choice_words = [x for x in testing_words if x in self.choose_words]
                               
                          
-                         if '$' in phrase:
-                              all_words = self.get_best_word_by_information(choice_words,
+                         if '$' in phrase and self.choose_words:
+                              testing_words = self.get_best_word_by_information(all_words=testing_words,
                                                                            choice_words=choice_words,
+                                                                           over_list=remaining_words,
                                                                            schema_string=last_schema_string,
                                                                            already_chosen=already_chosen)
                          else:
                               
-                             all_words = self.get_best_word_by_information(all_words,
-                                                                           choice_words=None,
+                             testing_words = self.get_best_word_by_information(all_words=testing_words,
+                                                                           choice_words=choice_words,
+                                                                           over_list=remaining_words,
                                                                            schema_string=last_schema_string,
                                                                            already_chosen=already_chosen)
 
                     if '~' in phrase:
-                         all_words = list(reversed(all_words))
+                         testing_words = list(reversed(testing_words))
                          
                     
                          
                     if 's' in phrase:
                          
-                         top_value = value_function(all_words[0],histo_tuple=histo_tuple)
+                         top_value = value_function(testing_words[0],histo_tuple=histo_tuple)
                          pos = 0
-                         for pos, w in enumerate(all_words):
+                         for pos, w in enumerate(testing_words):
                               if (('$' not in phrase and value_function(w,histo_tuple=histo_tuple) < top_value)
-                                  or ('$' in phrase and value_function(w,histo_tuple=histo_tuple) > top_value)):
+                                  or ('$' in phrase and self.choose_words and value_function(w,histo_tuple=histo_tuple) > top_value)):
                                    break
-                         all_words = all_words[0:pos]
+                         testing_words = testing_words[0:pos]
                          
 
                     if 'r' in phrase:
-                         up_to_here = int(len(all_words)/divider)+add_to
+                         up_to_here = int(len(testing_words)/divider)+add_to
                          if up_to_here == 0:
                               up_to_here = 1
-                         if up_to_here > len(all_words):
-                              up_to_here = len(all_words)
+                         if up_to_here > len(testing_words):
+                              up_to_here = len(testing_words)
                               
-                         try_this = random.choice(all_words[0:up_to_here])
+                         try_this = random.choice(testing_words[0:up_to_here])
                     elif 'p' in phrase: #F for by percentage
-                         try_this = all_words[int(len(all_words)*rank_position)]
+                         try_this = testing_words[int(len(testing_words)*rank_position)]
                     else:
-                         try_this = all_words[0]
+                         try_this = testing_words[0]
 
                     if not return_all:
                          return try_this
-                    return all_words
+                    return testing_words
      
                          
                                                    
@@ -930,7 +1039,8 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 
                if ';' not in script:
                     
-                    y =solve_phrase(all_words=all_words,
+                    y =solve_phrase(remaining_words=remaining_words,
+                                    testing_words=testing_words,
                                     phrase=script,
                                     schema_string=last_schema_string,
                                     already_chosen=already_chosen,
@@ -942,7 +1052,8 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                
                     
                elif not script:
-                    return solve_phrase(all_words=all_words,
+                    return solve_phrase(remaining_words=remaining_words,
+                                        testing_words=testing_words,
                                         phrase='r',
                                         schema_string=last_schema_string,
                                         already_chosen=already_chosen,
@@ -956,14 +1067,15 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                       and '.' in script.split(';')[0]
                       and script.split('.')[0].strip().isnumeric()):
                          cut_off = int(script.split('.')[0].strip())
-                         if len(all_words) < cut_off:
+                         if len(remaining_words) < cut_off:
                               script = ';'.join(script.split(';'))[1:]
                          else:
                            break
                          
                     phrase = script.split(';')[0]
                     script = ';'.join(script.split(';')[1:])
-                    return solve_phrase(all_words=all_words,
+                    return solve_phrase(remaining_words=remaining_words,
+                                        testing_words=testing_words,
                                         phrase=phrase,
                                         schema_string=last_schema_string,
                                         already_chosen=already_chosen,
@@ -972,7 +1084,8 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                                         printing=printing),script
 
           if fetch:
-                    return solve_mode(all_words=all_words,
+                    return solve_mode(remaining_words=remaining_words,
+                                      testing_words=testing_words,
                                       script = script,
                                       schema_string=None,
                                       already_chosen=None,
@@ -996,11 +1109,12 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
               
                if play_mode:
                     
-                    try_this = with_play_mode(all_words=all_words)
+                    try_this = with_play_mode(all_words=remaining_words)
        
                else:
 
-                    try_this, script = solve_mode(all_words=all_words,
+                    try_this, script = solve_mode(remaining_words=remaining_words,
+                                                  testing_words=testing_words,
                                                   script = script,
                                                   schema_string=last_schema_string,
                                                   already_chosen=already_chosen,
@@ -1033,17 +1147,27 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                
 ##               if printing:
 ##                    print(self.show(try_this, schema))
-               if hard:
-                    all_words = self.get_possible_words (try_this,all_words, schema)
 
                
-               if try_this in all_words:
-                    all_words.pop(all_words.index(try_this))
+               remaining_words, testing_words = (self.get_possible_words (try_this,remaining_words, schema,test_words = False),
+                                             self.get_possible_words (try_this,testing_words, schema,test_words = True))
+               
+  
+               
 
-               if self.show_length and len(all_words)>0:
-                    print('THERE ARE ',len(all_words),' REMAINING WORDS')
-               if self.show_words and 0<len(all_words)<100:
-                    print(', '.join(all_words))    
+               
+
+
+               
+               if try_this in remaining_words:
+                    remaining_words.pop(remaining_words.index(try_this))
+               if try_this in testing_words:
+                    testing_words.pop(testing_words.index(try_this))
+
+               if self.show_length and len(remaining_words)>0:
+                    print('THERE ARE ',len(remaining_words),' REMAINING WORDS')
+               if self.show_words and 0<len(remaining_words)<100:
+                    print(', '.join(remaining_words))    
                if solved:
                     to_solve = to_solve.lower()
                     definition = ''
@@ -1389,9 +1513,59 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                elif answer == 'g':
                     if self.choose_words:
                          print('CHOICE')
-                         print(self.get_best_word_by_information(self.choose_words,subset=[input('word?')]))
+                         print(self.get_best_word_by_information(self.choose_words,over_list=[input('word?')]))
                     else:
-                         print(self.get_best_word_by_information(self.words,subset=[input('word?')]))
+                         print(self.get_best_word_by_information(self.words,over_list=[input('word?')]))
+
+               elif answer == '+':
+
+                    def is_other_word (word_a,word_b, schema):
+                         word_a = list(word_a)
+                         word_b = list(word_b)
+                         found_letters = set()
+
+                         for position in schema[0]:
+
+                              if word_a[position] != word_b[position]:
+
+                                   return False
+                              else:
+                                   word_b[position] == ' '
+                                   found_letters.add(word_a[position])
+
+
+                         for position in schema[1]:
+                              if word_a[position] in word_b and not word_a[position]==word_b[position]:
+                                   word_b[word_b.index(word_a[position])] == ' '
+                                   found_letters.add(word_a[position])
+                              else:
+
+                                   return False
+                  
+                              
+                         for position in schema[2]:
+                              if word_a[position] in word_b and word_a[position] not in found_letters:
+                                   return False
+                         return True
+                    
+                    c_x = 0
+                    
+                    for word1 in self.words:
+                         for word2 in self.words:
+                              c_x+=1
+                              solve, schema = self.compare_word(word1,word2)
+                              
+                              satisfies = is_other_word(word1,word2,schema)
+                              if not satisfies:
+                                   print('A',word1,word2,schema)
+                              else:
+                                   pass
+                              if c_x % 1000 == 0:
+                                   print(c_x)
+                              
+                          
+                              
+                         
                elif answer == 'd':
 
                     inp = input('ENTER SCRIPT')
