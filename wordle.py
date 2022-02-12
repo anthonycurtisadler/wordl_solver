@@ -65,7 +65,12 @@ class Wordle_Solver:
 ##          ,
 ##                          9:'~f',
 ##                          10:'{zylyl};~$i'
-##                          
+####
+
+##          self.script_defaults = {0:'{stern};{yclad};fe$',
+##                                  1:'{stern};{yclad};fe',
+##                                  2:'{stern};{yclad};f$',
+##                                  3:'{stern};{yclad};f'}
                                   
           self.scripts = copy.deepcopy(self.script_defaults)
 
@@ -702,15 +707,19 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 
                     return_list.append(to_check)
                     
-               if not test_words and  is_other_word(word, to_check, schema):
+               elif not test_words and  is_other_word(word, to_check, schema):
 
                     return_list.append(to_check)
 
+               
           return return_list
 
-     def show (self, word, schema):
+     def show (self, word, schema,information=False):
 
           """Returns a string display the result of a comparison"""
+
+          if information:
+               return schema[0:2]
           
           result = ''
 
@@ -878,13 +887,11 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 
                     """Interprets the phrase expressing the solving method"""
 
-                    
+
 
                     if ('i' in phrase  or 'f' in phrase) and 'e' in phrase:
-                         if '$' not in phrase:
-                              testing_words = list(self.words)
-                         else:
-                              testing_words = list(self.choose_words)
+
+                         testing_words = list(self.words)
                               
                     
                     if counter == 1:
@@ -893,10 +900,7 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                               main_histo = self.histogram
                               letter_histo = self.letter_histogram
 
-                              if '$' in phrase and self.choose_words:
-                                   testing_words = list(self.choose_words)
-                              else:
-                                   testing_words = list(self.words)
+                             
                          else:
                               print()
                               
@@ -906,14 +910,16 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
                               letter_histo = {}
 
                               if printing:
-                                   print('   MAKING NEW HISTOGRAM FOR ',len(testing_words),' WORDS')
+                                   print('   MAKING NEW HISTOGRAM FOR ',len(remaining_words),' WORDS')
                               main_histo = self.make_histogram(word_list=remaining_words,histo_object=main_histo)
                               letter_histo = self.make_letter_histogram(word_list=remaining_words,histo_object=letter_histo)
                          else:
                               print()
 
-                    if '$' in phrase and counter > 1:
+
+                    if '$' in phrase:
                          testing_words = [x for x in testing_words if x in self.choose_words]
+
                     
                     
                     if '{' in phrase and '}' in phrase and count==1:
@@ -1149,10 +1155,11 @@ INT.  = at beginning of strategy to indicate maximum sent on which the given met
 ##                    print(self.show(try_this, schema))
 
                
+               
                remaining_words, testing_words = (self.get_possible_words (try_this,remaining_words, schema,test_words = False),
                                              self.get_possible_words (try_this,testing_words, schema,test_words = True))
                
-  
+
                
 
                
